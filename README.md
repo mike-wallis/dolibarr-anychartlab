@@ -8,7 +8,7 @@ It is a prototype to try a design on real charts and collect feedback before pro
 Dolibarr core. **It changes nothing in your accounting.** It only reads your ledger, and keeps its
 own settings in its own tables.
 
-> **Status: prototype (v0.1), for testing and feedback.** Not a finished module: please try it on a
+> **Status: prototype (v0.2), for testing and feedback.** Not a finished module: please try it on a
 > copy of your database or a test install first, and report problems on
 > [#31760](https://github.com/Dolibarr/dolibarr/issues/31760) or in this repository's Issues.
 
@@ -59,6 +59,46 @@ Two optional extras per account:
    *Show entries* (ledger entries under each account), *Hide empty lines* (with a layout), and
    export as **CSV**, **PDF** or **Preview PDF**.
 
+   The Income Statement can also show **several columns**: *Columns* = Months, Quarters (fiscal)
+   or Fiscal years across the date range, with a Total column (at most 13 periods; `*` marks a
+   part period), or *Compare with* = Previous period / Same period last year, with Change and
+   Change % columns. Quarters and years follow the fiscal year start month (Setup > Company).
+   Works by nature and with layouts, on screen, in CSV and in PDF (landscape).
+
+   The Balance Sheet has the same options for **dates**: *Columns* = Month-ends, Quarter-ends
+   (fiscal) or Fiscal year-ends from a start date up to the "As of" date (each column has its own
+   balance check line), or *Compare with* = End of previous month / End of last fiscal year / Same
+   date last year, with Change and Change % columns.
+
+## Trial Balance
+
+Accounting > Any-Chart Reports Lab > **Trial Balance**: every account with a balance or a movement
+in the period: opening balance, debits, credits and closing balance (debit / credit columns), with
+its nature. In account order, or **grouped by nature** with subtotals. Entries come from the same
+window as the Balance Sheet (after the last closed fiscal year), so the closing balances are the
+Balance Sheet at the end date. Checks: debits = credits for the period, closing debit balances =
+closing credit balances. Accounts with no nature are flagged (they are in the Trial Balance but left
+out of the statements). CSV / PDF (landscape).
+
+## Cash Flow statement
+
+Accounting > Any-Chart Reports Lab > **Cash Flow** (indirect method): the profit for the period,
+then the movement of every other balance sheet account in its **cash flow class**: operating
+(working capital; non-cash items such as depreciation are added back), investing (fixed assets) or
+financing (loans, equity). **Cash** = the accounting accounts of Dolibarr's bank and cash accounts
+(Banks / Cash), plus any account set to "Cash". Opening cash + net cash flow is checked against the
+cash accounts at the end. Opening-balance entries dated in the period (journals of type "opening",
+bank accounts' initial balances) count as opening balances, not cash flows.
+
+Each account's class is suggested automatically (bank accounts; equity = financing; labels such as
+loan, lease, overdraft = financing; vehicle, equipment, "at cost", goodwill = investing; depreciation
+= operating; French PCG by class number) and can be changed in the **Cash flow** column of Account
+natures. The class is included in the mapping export / import (`cf_class`). Accounts with no nature
+are shown in their own section, so the statement still adds up.
+
+If you installed an earlier copy of the module, **disable and enable it once** (Setup > Modules):
+that adds the new column to its table. Nothing else is changed.
+
 ## Accounts Receivable / Accounts Payable (from the ledger)
 
 Accounting > Any-Chart Reports Lab > **Accounts Receivable** / **Accounts Payable**: what each
@@ -71,6 +111,16 @@ can switch the order), Summary (one line per third party) or Detailed (each open
 with its date and due date), CSV / PDF (landscape). Two checks: **1.** the report total equals the control account balance (as on the
 Balance Sheet); **2.** per third party, ledger vs Dolibarr's unpaid invoices (as of today), which
 shows invoices or payments not transferred to accounting or not matched in Dolibarr.
+
+**Source = Unpaid invoices** builds the same report from Dolibarr's invoices instead of the ledger:
+what was still owing on each validated invoice at the date (total, less payments dated up to the
+date and credit notes / deposits applied; invoices closed by the date owe nothing), plus unused
+credit notes and available credits shown as credits. Checked against Dolibarr's "remaining to pay".
+It is the **default with cash accounting** (Accounting > Setup > Cash accounting): in that mode
+Dolibarr transfers payments straight to income and expense accounts, so the ledger has no
+receivables or payables. The other reports read the ledger and work in both modes (with cash
+accounting the Income Statement is a cash-basis result and the Balance Sheet has no trade debtors /
+creditors).
 
 ## Layouts (country presentation)
 

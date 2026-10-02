@@ -8,6 +8,10 @@
  * Open items per third party, aged by due date or document date, with two checks:
  *  1. report total = balance of the control account(s) in the ledger,
  *  2. per third party, ledger vs Dolibarr's unpaid invoices (today's position).
+ *
+ * Source "invoices": built from Dolibarr's invoices and payments instead of the ledger.
+ * It is the default with cash accounting (Accounting > Setup), where invoices are not
+ * transferred to the ledger, so the control accounts stay empty.
  */
 
 $res = 0;
@@ -35,6 +39,9 @@ $view = (GETPOST('view', 'aZ09') === 'detailed' ? 'detailed' : 'summary');
 $asof = GETPOSTINT('asofyear') ? dol_mktime(23, 59, 59, GETPOSTINT('asofmonth'), GETPOSTINT('asofday'), GETPOSTINT('asofyear')) : dol_mktime(23, 59, 59, (int) dol_print_date(dol_now(), '%m'), (int) dol_print_date(dol_now(), '%d'), (int) dol_print_date(dol_now(), '%Y'));
 $accountsParam = trim(GETPOST('accounts', 'alphanohtml'));
 $accounts = ($accountsParam !== '' ? array_values(array_filter(array_map('trim', preg_split('/[,; ]+/', $accountsParam)))) : anychartlab_aged_default_accounts($type));
+$cashMode = (getDolGlobalString('ACCOUNTING_MODE') === 'RECETTES-DEPENSES');
+$source = GETPOST('source', 'aZ09');
+$source = (in_array($source, array('ledger', 'invoices')) ? $source : ($cashMode ? 'invoices' : 'ledger'));
 
 $entity = (int) $conf->entity;
 $pcgversion = anychartlab_active_chart($db);
@@ -48,8 +55,13 @@ if (anychartlab_cfg('AGED_ORDER') !== 'newest') {
 	$shortBuckets = array_reverse($shortBuckets, true);
 }
 
-$aged = anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis);
-$ledgerBalance = anychartlab_aged_ledger_balance($db, $entity, $type, $accounts, $asof);
+if ($source === 'invoices') {
+	$aged = anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis);
+	$ledgerBalance = null;
+} else {
+	$aged = anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis);
+	$ledgerBalance = anychartlab_aged_ledger_balance($db, $entity, $type, $accounts, $asof);
+}
 $isToday = (dol_print_date($asof, '%Y-%m-%d') === dol_print_date(dol_now(), '%Y-%m-%d'));
 
 // Rows shared by screen, CSV and PDF: label, date, due, buckets..., total
@@ -63,12 +75,12 @@ foreach ($aged['parties'] as $p) {
 	$rows[] = array('kind' => ($view === 'detailed' ? 'parent' : 'account'), 'cells' => $cells, 'party' => $p);
 	if ($view === 'detailed') {
 		foreach ($p['items'] as $it) {
-			$c = array($it['ref'].(!empty($it['unallocated']) ? ' (unallocated '.($it['type'] === 'bank' ? 'payment' : 'credit').')' : ''), dol_print_date($it['date'], 'day'), ($it['type'] === 'bank' ? '' : dol_print_date($it['due'], 'day')));
+			$c = array($it['ref'].(!empty($it['unallocated']) && $it['type'] !== 'credit' ? ' (unallocated '.($it['type'] === 'bank' ? 'payment' : 'credit').')' : ''), dol_print_date($it['date'], 'day'), (in_array($it['type'], array('bank', 'credit')) ? '' : dol_print_date($it['due'], 'day')));
 			foreach (array_keys($buckets) as $k) {
 				$c[] = ($it['bucket'] === $k ? $it['remain'] : '');
 			}
 			$c[] = $it['remain'];
-			$rows[] = array('kind' => 'child', 'cells' => $c);
+			$rows[] = array('kind' => 'child', 'cells' => $c, 'url' => ($it['url'] ?? ''));
 		}
 	}
 }
@@ -92,7 +104,7 @@ if ($view === 'summary') {
 
 if (in_array($action, array('export', 'pdf', 'pdfpreview'))) {
 	$name = ($type === 'ap' ? 'accounts-payable' : 'accounts-receivable').'-'.dol_print_date($asof, '%Y-%m-%d');
-	$subtitle = 'As of '.dol_print_date($asof, 'day').' - aged by '.($basis === 'doc' ? 'document date' : 'due date').' - account(s) '.implode(', ', $accounts).' - amounts in '.$conf->currency;
+	$subtitle = 'As of '.dol_print_date($asof, 'day').' - aged by '.($basis === 'doc' ? 'document date' : 'due date').' - '.($source === 'invoices' ? 'from unpaid invoices' : 'account(s) '.implode(', ', $accounts)).' - amounts in '.$conf->currency;
 	if ($action === 'export') {
 		$csv = array();
 		foreach ($rows as $r) {
@@ -139,21 +151,49 @@ print '<input type="hidden" name="token" value="'.newToken().'"><input type="hid
 print 'As of '.$form->selectDate($asof, 'asof', 0, 0, 0, 'agedform').' ';
 print 'Aged by <select name="basis" class="flat"><option value="due"'.($basis === 'due' ? ' selected' : '').'>due date</option><option value="doc"'.($basis === 'doc' ? ' selected' : '').'>document date</option></select> ';
 print 'View <select name="view" class="flat"><option value="summary"'.($view === 'summary' ? ' selected' : '').'>Summary (one line per '.strtolower($partyWord).')</option><option value="detailed"'.($view === 'detailed' ? ' selected' : '').'>Detailed (open items)</option></select> ';
-print 'Account(s) <input type="text" name="accounts" class="flat width100" value="'.dol_escape_htmltag(implode(',', $accounts)).'" title="Control account(s); default from Accounting setup"> ';
+print 'Source <select name="source" class="flat" id="acl_source"><option value="ledger"'.($source === 'ledger' ? ' selected' : '').'>Accounting ledger</option><option value="invoices"'.($source === 'invoices' ? ' selected' : '').'>Unpaid invoices</option></select> ';
+print '<span id="acl_accounts"'.($source === 'invoices' ? ' style="display:none"' : '').'>Account(s) <input type="text" name="accounts" class="flat width100" value="'.dol_escape_htmltag(implode(',', $accounts)).'" title="Control account(s); default from Accounting setup"> </span>';
+print '<script>jQuery(function(){jQuery("#acl_source").on("change",function(){jQuery("#acl_accounts").toggle(jQuery(this).val()==="ledger");});});</script>';
 print '<input type="submit" class="button small" value="Refresh"> ';
 print '<button type="submit" class="button small" name="action" value="export">Export CSV</button> ';
 print '<button type="submit" class="button small" name="action" value="pdf">PDF</button> ';
 print '<button type="submit" class="button small" name="action" value="pdfpreview" formtarget="_blank">Preview PDF</button>';
 print '</form>';
 
-if (!$accounts) {
+if ($cashMode) {
+	print '<div class="info"><b>Cash accounting</b> is selected in Accounting &gt; Setup. In that mode Dolibarr transfers payments straight to income and expense accounts, so the ledger has no '.($type === 'ap' ? 'trade creditors' : 'trade debtors').': this report is therefore built from the <b>unpaid invoices</b>.'.($source === 'ledger' ? ' <b>You chose the ledger: expect it to be empty.</b>' : '').'</div>';
+}
+if ($source === 'ledger' && !$accounts) {
 	print '<div class="warning">No '.($type === 'ap' ? 'supplier' : 'customer').' control account is set in Accounting &gt; Setup. Enter the account number(s) above.</div>';
 }
-print '<p class="opacitymedium">From the accounting ledger: entries on account(s) <b>'.dol_escape_htmltag(implode(', ', $accounts)).'</b> up to the date, per '.strtolower($partyWord).' (subledger account). '.($aged['lettered'] ? $aged['lettered'].' lettered entries matched by their lettering; others ' : 'Payments and credit notes ').'are matched to the oldest open invoices of the same '.strtolower($partyWord).'. Amounts in '.dol_escape_htmltag($conf->currency).'.</p>';
+if ($source === 'invoices') {
+	print '<p class="opacitymedium">From Dolibarr\'s invoices: what was still owing on each validated invoice at the date (total incl. tax, less payments dated up to the date and credit notes / deposits applied to it; an invoice closed on or before the date owes nothing). Unused credit notes and available credits are shown as credits. Amounts in '.dol_escape_htmltag($conf->currency).'.</p>';
+} else {
+	print '<p class="opacitymedium">From the accounting ledger: entries on account(s) <b>'.dol_escape_htmltag(implode(', ', $accounts)).'</b> up to the date, per '.strtolower($partyWord).' (subledger account). '.($aged['lettered'] ? $aged['lettered'].' lettered entries matched by their lettering; others ' : 'Payments and credit notes ').'are matched to the oldest open invoices of the same '.strtolower($partyWord).'. Amounts in '.dol_escape_htmltag($conf->currency).'.</p>';
+}
 
-// Check 1: total = control account balance
-$diff = $aged['total'] - $ledgerBalance;
-print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check 1:</b> report total '.anychartlab_price($aged['total']).' = balance of account(s) '.dol_escape_htmltag(implode(', ', $accounts)).' in the ledger '.anychartlab_price($ledgerBalance).(abs($diff) < 0.005 ? ' (as on the Balance Sheet).' : '. Difference '.anychartlab_price($diff).'.').'</div>';
+if ($source === 'ledger') {
+	// Check 1: total = control account balance
+	$diff = $aged['total'] - $ledgerBalance;
+	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check 1:</b> report total '.anychartlab_price($aged['total']).' = balance of account(s) '.dol_escape_htmltag(implode(', ', $accounts)).' in the ledger '.anychartlab_price($ledgerBalance).(abs($diff) < 0.005 ? ' (as on the Balance Sheet).' : '. Difference '.anychartlab_price($diff).'.').'</div>';
+} elseif ($isToday) {
+	// Check: open invoices = Dolibarr's "remaining to pay" (today's position)
+	$byName = array();
+	foreach (anychartlab_aged_unpaid_invoices($db, $entity, $type) as $u) {
+		$byName[$u['name']] = $u['remain'];	// keyed twice (code and accounting code): once per third party
+	}
+	$dolTotal = array_sum($byName);
+	$credits = 0.0;
+	foreach ($aged['parties'] as $p) {
+		foreach ($p['items'] as $it) {
+			if ($it['type'] === 'credit') {
+				$credits += $it['remain'];
+			}
+		}
+	}
+	$diff = ($aged['total'] - $credits) - $dolTotal;
+	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check:</b> open invoices '.anychartlab_price($aged['total'] - $credits).' = Dolibarr\'s remaining to pay on unpaid invoices '.anychartlab_price($dolTotal).(abs($diff) < 0.005 ? '.' : '. Difference '.anychartlab_price($diff).'.').($credits ? ' Plus available credits '.anychartlab_price($credits).' = report total '.anychartlab_price($aged['total']).'.' : '').'</div>';
+}
 if (abs($aged['nothirdparty']) >= 0.005) {
 	print '<div class="warning">'.anychartlab_price($aged['nothirdparty']).' is on the control account without a '.strtolower($partyWord).' (no subledger account on the entry). It is in the total but cannot be aged per '.strtolower($partyWord).'.</div>';
 }
@@ -168,7 +208,7 @@ print '<th class="right">Total</th></tr>';
 foreach ($rows as $r) {
 	$c = $r['cells'];
 	print '<tr class="'.($r['kind'] === 'grandtotal' ? 'liste_total' : 'oddeven').' acl-'.$r['kind'].'">';
-	print '<td>'.dol_escape_htmltag($c[0]).'</td>';
+	print '<td>'.(!empty($r['url']) ? '<a href="'.$r['url'].'">'.dol_escape_htmltag($c[0]).'</a>' : dol_escape_htmltag($c[0])).'</td>';
 	for ($i = 1; $i < $amt; $i++) {
 		print '<td class="nowraponall">'.dol_escape_htmltag($c[$i]).'</td>';
 	}
@@ -184,10 +224,13 @@ if (!$aged['parties']) {
 print '</table>';
 
 // Check 2: ledger vs unpaid invoices (today only)
-print '<h3>Check 2: ledger vs Dolibarr unpaid invoices</h3>';
-if (!$isToday) {
+if ($source === 'invoices') {
+	// nothing more: the comparison with the ledger is Check 2 of the ledger source
+} elseif (!$isToday) {
+	print '<h3>Check 2: ledger vs Dolibarr unpaid invoices</h3>';
 	print '<p class="opacitymedium">Only available as of today: Dolibarr\'s "remaining to pay" on invoices is today\'s position.</p>';
 } else {
+	print '<h3>Check 2: ledger vs Dolibarr unpaid invoices</h3>';
 	$unpaid = anychartlab_aged_unpaid_invoices($db, $entity, $type);
 	$cmp = array();
 	$seen = array();

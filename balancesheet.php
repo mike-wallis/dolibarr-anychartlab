@@ -23,6 +23,7 @@ if (!$res) {
 }
 require_once __DIR__.'/lib/anychartlab.lib.php';
 require_once __DIR__.'/lib/layout.lib.php';
+require_once __DIR__.'/lib/periods.lib.php';
 
 if (!$user->hasRight('anychartlab', 'lire')) {
 	accessforbidden();
@@ -37,55 +38,90 @@ $showEntries = ($filtered ? GETPOSTINT('show_entries') : (int) anychartlab_cfg('
 $hideEmpty = ($filtered ? GETPOSTINT('hide_empty') : (int) anychartlab_cfg('DEFAULT_HIDE_EMPTY'));
 $asof = GETPOSTINT('asofyear') ? dol_mktime(23, 59, 59, GETPOSTINT('asofmonth'), GETPOSTINT('asofday'), GETPOSTINT('asofyear')) : dol_now();
 
+$columnsMode = GETPOST('columns', 'aZ09');
+$columnsMode = (in_array($columnsMode, array('months', 'quarters', 'years')) ? $columnsMode : 'single');
+$compare = GETPOST('compare', 'aZ09');
+$compare = ($columnsMode === 'single' && in_array($compare, array('prevmonth', 'prevfy', 'lastyear')) ? $compare : 'none');
+$matrix = ($columnsMode !== 'single' || $compare !== 'none');	// several amount columns
+$colFrom = GETPOSTINT('colfromyear') ? dol_mktime(0, 0, 0, GETPOSTINT('colfrommonth'), GETPOSTINT('colfromday'), GETPOSTINT('colfromyear')) : anychartlab_fiscal_year_start($asof);
+
 $entity = (int) $conf->entity;
 $pcgversion = anychartlab_active_chart($db);
-$bs = ($pcgversion !== '' ? anychartlab_build_balance_sheet($db, $entity, $pcgversion, $asof) : null);
-$entries = ($bs && $showEntries && $view === 'detailed' ? anychartlab_load_entries($db, $entity, $bs['window']['start'], $asof) : null);
+$accounts = ($pcgversion !== '' ? anychartlab_load_accounts($db, $entity, $pcgversion) : null);
 $layoutId = GETPOSTINT('layout');
-$layout = ($bs && $layoutId ? anychartlab_layout_fetch($db, $layoutId, $entity) : null);
+$layout = ($accounts && $layoutId ? anychartlab_layout_fetch($db, $layoutId, $entity) : null);
 if ($layout && $layout->statement !== 'BS') {
 	$layout = null;
 }
-$laid = null;
-if ($layout) {
-	$alllines = array();
-	foreach (array('ASSET','LIABILITY','EQUITY') as $sec) {
-		$alllines = array_merge($alllines, $bs['sections'][$sec]);
-	}
-	$laid = anychartlab_apply_layout($layout, $alllines, array('RESULT' => $bs['result']));
+$entries = null;
+if ($accounts && $showEntries && $view === 'detailed' && !$matrix) {
+	$w = anychartlab_window_start($db, $entity, $asof);
+	$entries = anychartlab_load_entries($db, $entity, $w['start'], $asof);
 }
+$base = ($accounts ? anychartlab_bs_rows($db, $entity, $accounts, $asof, $layout, $view, $hideEmpty, $entries, $matrix) : null);
+$bs = ($base ? $base['bs'] : null);
+$laid = ($base ? $base['laid'] : null);
 
 $titles = array('ASSET' => 'Assets', 'LIABILITY' => 'Liabilities', 'EQUITY' => 'Equity');
 
 $hidden = ($laid && $hideEmpty ? anychartlab_layout_hidden($laid) : array());
 
-if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $bs) {
-	$rows = array();
-	if ($laid) {
-		$rows = anychartlab_layout_csv($laid, $bs['accounts'], $view, $entries, $hidden);
-	if ($laid['unmatched']) {
-		$rows[] = anychartlab_r(array('Not in layout', '', '', '', ''), 'section');
-		$sum = 0.0;
-		foreach ($laid['unmatched'] as $l) {
-			$rows[] = anychartlab_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, 'placed as '.$l['section'], price2num($l['amount'], 'MT')), 'account');
-			$sum += $l['amount'];
-		}
-		$rows[] = anychartlab_r(array('', 'Total not in layout', '', '', price2num($sum, 'MT')), 'total');
-	}
-	} else {
-		foreach ($titles as $code => $title) {
-			$rows[] = anychartlab_r(array($title, '', '', '', ''), 'section');
-			$rows = array_merge($rows, anychartlab_groups_csv(anychartlab_group_lines($bs['sections'][$code], $bs['accounts']), $view, $entries, $code));
-			if ($code === 'EQUITY') {
-				$rows[] = anychartlab_r(array('', 'Result of unclosed periods', '', '', price2num($bs['result'], 'MT')), 'account');
-				$rows[] = anychartlab_r(array('', 'Total equity', '', '', price2num($bs['totals']['EQUITY'] + $bs['result'], 'MT')), 'total');
-			} else {
-				$rows[] = anychartlab_r(array('', 'Total '.strtolower($title), '', '', price2num($bs['totals'][$code], 'MT')), 'total');
+// Several columns: the Balance Sheet at several dates, or at this date and another one
+$matrixError = '';
+$colDefs = array();
+$merged = array();
+$periodNote = '';
+$windows = array();	// window label per column date, to say when they differ
+if ($base && $matrix) {
+	$lists = array($base['rows']);
+	$windows[$base['bs']['window']['label']] = true;
+	if ($columnsMode !== 'single') {
+		$dates = ($colFrom < $asof ? anychartlab_bs_dates($colFrom, $asof, $columnsMode) : array());
+		if (count($dates) > ANYCHARTLAB_MAX_PERIODS) {
+			$matrixError = count($dates).' dates in this range: at most '.ANYCHARTLAB_MAX_PERIODS.' columns. Move the first date closer or choose larger periods.';
+		} elseif (count($dates) < 2) {
+			$matrixError = 'The first date must be before the "As of" date.';
+		} else {
+			foreach ($dates as $i => $d) {
+				if ($i === count($dates) - 1) {
+					$colDefs[] = array('label' => dol_print_date($asof, 'day'), 'title' => 'As of '.dol_print_date($asof, 'day'), 'src' => 0);
+					continue;
+				}
+				$r = anychartlab_bs_rows($db, $entity, $accounts, $d, $layout, $view, $hideEmpty, null, true);
+				$windows[$r['bs']['window']['label']] = true;
+				$lists[] = $r['rows'];
+				$colDefs[] = array('label' => dol_print_date($d, 'day'), 'title' => 'As of '.dol_print_date($d, 'day'), 'src' => count($lists) - 1);
 			}
+			$periodNote = 'at each '.array('months' => 'month', 'quarters' => 'fiscal quarter', 'years' => 'fiscal year')[$columnsMode].' end from '.dol_print_date($colFrom, 'day');
 		}
-		$rows[] = anychartlab_r(array('', 'Total liabilities + equity', '', '', price2num($bs['total_liab_equity'], 'MT')), 'grandtotal');
+	} else {
+		$cd = anychartlab_bs_compare_date($asof, $compare);
+		$r = anychartlab_bs_rows($db, $entity, $accounts, $cd, $layout, $view, $hideEmpty, null, true);
+		$windows[$r['bs']['window']['label']] = true;
+		$lists[] = $r['rows'];
+		$colDefs = array(
+			array('label' => dol_print_date($asof, 'day'), 'title' => 'As of '.dol_print_date($asof, 'day'), 'src' => 0),
+			array('label' => dol_print_date($cd, 'day'), 'title' => 'As of '.dol_print_date($cd, 'day'), 'src' => 1),
+			array('label' => 'Change', 'title' => 'Current minus comparison', 'src' => 'chg'),
+			array('label' => 'Change %', 'title' => 'Change as a % of the comparison amount', 'src' => 'pct'),
+		);
+		$periodNote = 'compared with '.array('prevmonth' => 'the end of the previous month', 'prevfy' => 'the end of the last fiscal year', 'lastyear' => 'the same date last year')[$compare].' ('.dol_print_date($cd, 'day').')';
 	}
-	$rows[] = anychartlab_r(array('', (abs($bs['difference']) < 0.005 ? 'Check: assets = liabilities + equity' : 'CHECK FAILED: assets - (liabilities + equity)'), '', '', price2num($bs['difference'], 'MT')), 'grandtotal');
+	if ($matrixError === '') {
+		$merged = anychartlab_merge_period_rows($lists);
+	} else {
+		$matrix = false;
+		$base = anychartlab_bs_rows($db, $entity, $accounts, $asof, $layout, $view, $hideEmpty, $entries, false);
+	}
+}
+
+if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $bs && $matrix) {
+	$name = 'balance-sheet-'.dol_print_date($asof, '%Y-%m-%d').($columnsMode !== 'single' ? '-'.$columnsMode : '-vs-'.$compare).($layout ? '-'.$layout->code : '');
+	anychartlab_matrix_send($action, $name, ($layout ? $layout->label : 'Balance Sheet'), 'As of '.dol_print_date($asof, 'day').' · '.$periodNote.' · amounts in '.$conf->currency, $merged, $colDefs);
+}
+
+if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $bs) {
+	$rows = $base['rows'];
 	$name = 'balance-sheet-'.dol_print_date($asof, '%Y-%m-%d').($layout ? '-'.$layout->code : '');
 	if ($action === 'export') {
 		anychartlab_send_csv('anychartlab-'.$name, array('account', 'label', 'nature', 'note', 'amount'), $rows);
@@ -118,6 +154,18 @@ print 'View <select name="view" class="flat"><option value="detailed"'.($view ==
 print '<label title="Lists the ledger entries under each account (Detailed view)"><input type="checkbox" name="show_entries" value="1"'.($showEntries ? ' checked' : '').'> Show entries</label> ';
 print '<label title="With a layout: hides lines and sections with no account balance"><input type="checkbox" name="hide_empty" value="1"'.($hideEmpty ? ' checked' : '').'> Hide empty lines</label> ';
 print '<label><input type="checkbox" name="show_draft" value="1"'.($showDraft ? ' checked' : '').'> Show design-draft codes</label> ';
+print '<br>Columns <select name="columns" class="flat" id="acl_columns">';
+foreach (array('single' => 'One date', 'months' => 'Month-ends', 'quarters' => 'Quarter-ends (fiscal)', 'years' => 'Fiscal year-ends') as $k => $v) {
+	print '<option value="'.$k.'"'.($columnsMode === $k ? ' selected' : '').'>'.$v.'</option>';
+}
+print '</select> ';
+print '<span id="acl_colfrom"'.($columnsMode === 'single' ? ' style="display:none"' : '').'>from '.$form->selectDate($colFrom, 'colfrom', 0, 0, 0, 'bsform').' </span>';
+print 'Compare with <select name="compare" class="flat" id="acl_compare"'.($columnsMode !== 'single' ? ' disabled' : '').'>';
+foreach (array('none' => 'Nothing', 'prevmonth' => 'End of previous month', 'prevfy' => 'End of last fiscal year', 'lastyear' => 'Same date last year') as $k => $v) {
+	print '<option value="'.$k.'"'.($compare === $k ? ' selected' : '').'>'.$v.'</option>';
+}
+print '</select> ';
+print '<script>jQuery(function(){jQuery("#acl_columns").on("change",function(){var one=(jQuery(this).val()==="single");jQuery("#acl_compare").prop("disabled",!one);jQuery("#acl_colfrom").toggle(!one);});});</script>';
 print '<input type="submit" class="button small" value="Refresh"> ';
 print '<button type="submit" class="button small" name="action" value="export">Export CSV</button>';
 print ' <button type="submit" class="button small" name="action" value="pdf">PDF</button>';
@@ -127,9 +175,21 @@ print '<p class="opacitymedium">Window: '.dol_escape_htmltag($bs['window']['labe
 foreach ($bs['window']['warnings'] as $w) {
 	print '<div class="warning">'.dol_escape_htmltag($w).'</div>';
 }
+if ($matrixError !== '') {
+	print '<div class="warning">'.dol_escape_htmltag($matrixError).'</div>';
+}
+if ($matrix) {
+	print '<p class="opacitymedium">'.dol_escape_htmltag(ucfirst($periodNote)).'. Each column is built like the one-date Balance Sheet; an account with no balance at a date is left blank there.'.(count($windows) > 1 ? ' The columns do not all start from the same closed fiscal year: '.dol_escape_htmltag(implode('; ', array_keys($windows))).'.' : '').($showEntries && $view === 'detailed' ? ' Ledger entries are only listed in the one-date report.' : '').'</p>';
+	if ($laid && $laid['errors']) {
+		print '<div class="warning">'.implode('<br>', array_map('dol_escape_htmltag', $laid['errors'])).'</div>';
+	}
+	anychartlab_matrix_print($merged, $colDefs, $accounts);
+}
 
 $cols = ($showDraft ? 4 : 3);
-if ($laid) {
+if ($matrix) {
+	// already printed above
+} elseif ($laid) {
 	if ($laid['errors']) {
 		print '<div class="warning">'.implode('<br>', array_map('dol_escape_htmltag', $laid['errors'])).'</div>';
 	}
@@ -154,11 +214,11 @@ if ($laid) {
 	print '</table>';
 }
 
-// Balance check
+// Balance check (of the "As of" date; with several columns each one has its check line)
 $ok = (abs($bs['difference']) < 0.005);
 print '<br><div class="'.($ok ? 'ok' : 'error').'" style="font-weight:bold">';
 if ($ok) {
-	print 'Check: Assets = Liabilities + Equity. The Balance Sheet balances.';
+	print 'Check: Assets = Liabilities + Equity. The Balance Sheet balances'.($matrix ? ' as of '.dol_print_date($asof, 'day') : '').'.';
 } else {
 	print 'Check failed: Assets − (Liabilities + Equity) = '.anychartlab_price($bs['difference']).'.';
 	if (abs($bs['difference'] - $bs['explained_by']) < 0.005) {

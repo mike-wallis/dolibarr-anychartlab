@@ -275,3 +275,118 @@ function anychartlab_aged_buckets_short($basis)
 	}
 	return array('b0' => 'Not due', 'b1' => '1-30', 'b2' => '31-60', 'b3' => '61-90', 'b4' => '90+');
 }
+
+/**
+ * Build the aged report from Dolibarr's invoices instead of the ledger (for cash
+ * accounting, where the ledger has no customer / supplier control accounts, or to
+ * compare). Same result structure as anychartlab_aged_build().
+ *
+ * Amount still owing on each validated invoice at the date: total incl. tax, less
+ * payments dated up to that date, less credit notes / deposits applied to it. An
+ * invoice closed (paid, or abandoned) on or before the date owes nothing. Credit
+ * notes not yet used, and available credits (discounts), are shown as negative items.
+ *
+ * @param DoliDB $db
+ * @param int    $entity
+ * @param string $type   ar or ap
+ * @param int    $asof
+ * @param string $basis  due or doc
+ * @return array{parties:array,totals:array,total:float,nothirdparty:float,lettered:int,entries:int}
+ */
+function anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis)
+{
+	$res = array('parties' => array(), 'totals' => array(), 'total' => 0.0, 'nothirdparty' => 0.0, 'lettered' => 0, 'entries' => 0);
+	foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+		$res['totals'][$k] = 0.0;
+	}
+	$ap = ($type === 'ap');
+	$t = ($ap ? 'facture_fourn' : 'facture');
+	$code = ($ap ? 's.code_fournisseur' : 's.code_client');
+	$d = "'".$db->idate($asof)."'";
+	$sql = "SELECT f.rowid, f.ref, ".($ap ? "f.ref_supplier," : "")." f.type, f.fk_soc, f.datef, f.date_lim_reglement, f.total_ttc, f.fk_statut, f.date_closing,";
+	$sql .= " s.nom, ".$code." as code,";
+	if ($ap) {
+		$sql .= " (SELECT SUM(pf.amount) FROM ".MAIN_DB_PREFIX."paiementfourn_facturefourn as pf INNER JOIN ".MAIN_DB_PREFIX."paiementfourn as p ON p.rowid = pf.fk_paiementfourn WHERE pf.fk_facturefourn = f.rowid AND p.datep <= ".$d.") as paid,";
+		$sql .= " (SELECT SUM(r.amount_ttc) FROM ".MAIN_DB_PREFIX."societe_remise_except as r WHERE r.fk_invoice_supplier = f.rowid) as credits";
+	} else {
+		$sql .= " (SELECT SUM(pf.amount) FROM ".MAIN_DB_PREFIX."paiement_facture as pf INNER JOIN ".MAIN_DB_PREFIX."paiement as p ON p.rowid = pf.fk_paiement WHERE pf.fk_facture = f.rowid AND p.datep <= ".$d.") as paid,";
+		$sql .= " (SELECT SUM(r.amount_ttc) FROM ".MAIN_DB_PREFIX."societe_remise_except as r WHERE r.fk_facture = f.rowid) as credits";
+	}
+	$sql .= " FROM ".MAIN_DB_PREFIX.$t." as f INNER JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = f.fk_soc";
+	$sql .= " WHERE f.entity IN (".getEntity($ap ? 'supplier_invoice' : 'invoice').") AND f.fk_statut IN (1, 2, 3) AND f.datef <= ".$d;
+	$sql .= " ORDER BY f.datef, f.rowid";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_print_error($db);
+		return $res;
+	}
+	$byParty = array();
+	while ($o = $db->fetch_object($resql)) {
+		$res['entries']++;
+		$closing = ($o->date_closing ? $db->jdate($o->date_closing) : null);
+		if ((int) $o->fk_statut !== 1 && ($closing === null || $closing <= $asof)) {
+			continue;	// paid or abandoned by the date
+		}
+		$remain = (float) $o->total_ttc - (float) $o->paid - (float) $o->credits;
+		if (abs($remain) < 0.005) {
+			continue;
+		}
+		$date = $db->jdate($o->datef);
+		$item = array('date' => $date, 'due' => ($o->date_lim_reglement ? $db->jdate($o->date_lim_reglement) : $date),
+			'ref' => $o->ref.($ap && !empty($o->ref_supplier) ? ' / '.$o->ref_supplier : ''), 'type' => ((int) $o->type === 2 ? 'credit note' : 'invoice'),
+			'remain' => $remain, 'url' => DOL_URL_ROOT.($ap ? '/fourn/facture/card.php?facid=' : '/compta/facture/card.php?facid=').((int) $o->rowid));
+		if ($remain < 0) {
+			$item['unallocated'] = 1;
+		}
+		anychartlab_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, $item);
+	}
+	// Available credits (credit notes / deposits / overpayments converted to a discount, not used yet)
+	$sql = "SELECT r.fk_soc, r.datec, r.amount_ttc, r.description, s.nom, ".$code." as code FROM ".MAIN_DB_PREFIX."societe_remise_except as r INNER JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = r.fk_soc";
+	$sql .= " WHERE r.entity IN (".getEntity('invoice').") AND r.discount_type = ".($ap ? 1 : 0)." AND r.datec <= ".$d;
+	$sql .= " AND r.fk_facture IS NULL AND r.fk_facture_line IS NULL AND r.fk_invoice_supplier IS NULL AND r.fk_invoice_supplier_line IS NULL";
+	$resql = $db->query($sql);
+	while ($resql && ($o = $db->fetch_object($resql))) {
+		$date = $db->jdate($o->datec);
+		anychartlab_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, array('date' => $date, 'due' => $date, 'ref' => 'Available credit: '.dol_trunc((string) $o->description, 40), 'type' => 'credit', 'remain' => -(float) $o->amount_ttc, 'unallocated' => 1, 'url' => ''));
+	}
+
+	foreach ($byParty as $p) {
+		$party = array('code' => $p['code'], 'name' => $p['name'], 'items' => array(), 'buckets' => array(), 'total' => 0.0);
+		foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+			$party['buckets'][$k] = 0.0;
+		}
+		foreach ($p['items'] as $it) {
+			$days = (int) floor(($asof - ($basis === 'doc' ? $it['date'] : $it['due'])) / 86400);
+			$it['days'] = $days;
+			$it['bucket'] = anychartlab_aged_bucket($days, $basis);
+			$party['buckets'][$it['bucket']] += $it['remain'];
+			$party['total'] += $it['remain'];
+			$party['items'][] = $it;
+		}
+		usort($party['items'], function ($a, $b) {
+			return $a['date'] <=> $b['date'];
+		});
+		foreach ($party['buckets'] as $k => $v) {
+			$res['totals'][$k] += $v;
+		}
+		$res['total'] += $party['total'];
+		$res['parties'][] = $party;
+	}
+	usort($res['parties'], function ($a, $b) {
+		return strcasecmp($a['name'], $b['name']);
+	});
+	return $res;
+}
+
+/**
+ * Add an open item to a third party (helper of anychartlab_aged_build_invoices()).
+ *
+ * @return void
+ */
+function anychartlab_aged_add_item(&$byParty, $socid, $name, $code, $item)
+{
+	if (!isset($byParty[$socid])) {
+		$byParty[$socid] = array('name' => $name, 'code' => $code, 'items' => array());
+	}
+	$byParty[$socid]['items'][] = $item;
+}

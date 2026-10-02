@@ -87,7 +87,7 @@ function anychartlab_load_accounts($db, $entity, $pcgversion)
 	$byRowid = array();
 	$byNumber = array();
 	$sql = "SELECT a.rowid, a.account_number, a.label, a.pcg_type, a.account_parent, a.active,";
-	$sql .= " n.nature, n.nature_alt, n.contra, n.source";
+	$sql .= " n.nature, n.nature_alt, n.contra, n.source, n.cf_class";
 	$sql .= " FROM ".MAIN_DB_PREFIX."accounting_account as a";
 	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."anychartlab_nature as n ON n.fk_accounting_account = a.rowid AND n.entity = ".((int) $entity);
 	$sql .= " WHERE a.entity = ".((int) $entity);
@@ -100,6 +100,7 @@ function anychartlab_load_accounts($db, $entity, $pcgversion)
 			$obj->nature = ($obj->nature === '' ? null : $obj->nature);
 			$obj->nature_alt = ($obj->nature_alt === '' ? null : $obj->nature_alt);
 			$obj->contra = (int) $obj->contra;
+			$obj->cf_class = ($obj->cf_class === '' ? null : $obj->cf_class);
 			$byRowid[(int) $obj->rowid] = $obj;
 			$byNumber[$obj->account_number] = $obj;
 		}
@@ -145,6 +146,35 @@ function anychartlab_save_nature($db, $user, $entity, $accountid, $nature, $natu
 		$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_nature (entity, fk_accounting_account, nature, nature_alt, contra, source, fk_user_modif) VALUES (";
 		$sql .= ((int) $entity).", ".((int) $accountid).", ".($nature ? "'".$db->escape($nature)."'" : "NULL").", ".($natureAlt ? "'".$db->escape($natureAlt)."'" : "NULL");
 		$sql .= ", ".($contra ? 1 : 0).", '".$db->escape($source)."', ".((int) $user->id).")";
+	}
+	return $db->query($sql) ? 1 : -1;
+}
+
+/**
+ * Set or clear the cash flow class of one account (CASH, OPERATING, INVESTING, FINANCING; null = suggested).
+ *
+ * @param DoliDB      $db
+ * @param User        $user
+ * @param int         $entity
+ * @param int         $accountid llx_accounting_account.rowid
+ * @param string|null $class
+ * @return int <0 on error
+ */
+function anychartlab_save_cf_class($db, $user, $entity, $accountid, $class)
+{
+	$class = (in_array((string) $class, array('CASH', 'OPERATING', 'INVESTING', 'FINANCING'), true) ? $class : null);
+	$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_nature WHERE entity = ".((int) $entity)." AND fk_accounting_account = ".((int) $accountid);
+	$resql = $db->query($sql);
+	if (!$resql) {
+		return -1;
+	}
+	$obj = $db->fetch_object($resql);
+	$value = ($class ? "'".$db->escape($class)."'" : "NULL");
+	if ($obj) {
+		$sql = "UPDATE ".MAIN_DB_PREFIX."anychartlab_nature SET cf_class = ".$value.", fk_user_modif = ".((int) $user->id)." WHERE rowid = ".((int) $obj->rowid);
+	} else {
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_nature (entity, fk_accounting_account, contra, source, cf_class, fk_user_modif) VALUES (";
+		$sql .= ((int) $entity).", ".((int) $accountid).", 0, 'manual', ".$value.", ".((int) $user->id).")";
 	}
 	return $db->query($sql) ? 1 : -1;
 }
@@ -676,8 +706,10 @@ function anychartlab_send_csv($filename, $header, $rows)
 function anychartlab_print_nav($current, $pcgversion)
 {
 	$pages = array(
+		'trialbalance.php' => 'Trial Balance',
 		'balancesheet.php' => 'Balance Sheet',
 		'incomestatement.php' => 'Income Statement',
+		'cashflow.php' => 'Cash Flow',
 		'aged.php?type=ar' => 'Receivables',
 		'aged.php?type=ap' => 'Payables',
 		'check.php' => 'Classification check',
@@ -1026,9 +1058,10 @@ function anychartlab_send_pdf($filename, $title, $subtitle, $rows, $inline)
  * @param array  $rows     Each array('kind' => line kind, 'cells' => display strings, one per column)
  * @param bool   $inline   true = show in the browser (preview)
  * @param string $orientation '' = Display setting, or force P / L (wide reports)
+ * @param float  $maxFont  0 = Display setting, else at most this base font size (many columns)
  * @return void
  */
-function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $inline, $orientation = '')
+function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $inline, $orientation = '', $maxFont = 0)
 {
 	global $conf, $langs, $mysoc;
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
@@ -1039,6 +1072,9 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 	}
 	$margin = max(5, min(40, (float) anychartlab_cfg('PDF_MARGIN')));
 	$base = max(6, min(14, (float) anychartlab_cfg('PDF_FONTSIZE')));
+	if ($maxFont > 0) {
+		$base = min($base, $maxFont);
+	}
 	$titleSize = max(8, min(28, (float) anychartlab_cfg('PDF_TITLESIZE')));
 	$font = (anychartlab_cfg('PDF_FONT') !== '' ? anychartlab_cfg('PDF_FONT') : pdf_getPDFFont($langs));
 

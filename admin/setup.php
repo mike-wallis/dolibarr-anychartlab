@@ -21,6 +21,7 @@ if (!$res) {
 	die('Include of main fails');
 }
 require_once dirname(__DIR__).'/lib/anychartlab.lib.php';
+require_once dirname(__DIR__).'/lib/cashflow.lib.php';
 
 if (!$user->hasRight('anychartlab', 'setup') && !$user->admin) {
 	accessforbidden();
@@ -90,6 +91,7 @@ if ($pcgversion !== '') {
 		$postNature = GETPOST('nature', 'array');
 		$postAlt = GETPOST('nature_alt', 'array');
 		$postContra = GETPOST('contra', 'array');
+		$postCf = GETPOST('cf_class', 'array');
 		$toselect = GETPOST('toselect', 'array:int');
 		$bulkNature = GETPOST('bulk_nature', 'aZ09');
 		$changed = 0;
@@ -109,6 +111,13 @@ if ($pcgversion !== '') {
 				anychartlab_save_nature($db, $user, $entity, (int) $rowid, $nature, $alt, $contra, 'manual');
 				$changed++;
 			}
+			if (isset($postCf[$rowid])) {
+				$cf = (isset(anychartlab_cf_classes()[$postCf[$rowid]]) ? $postCf[$rowid] : null);
+				if ($cf !== $acc->cf_class) {
+					anychartlab_save_cf_class($db, $user, $entity, (int) $rowid, $cf);
+					$changed++;
+				}
+			}
 		}
 		$db->commit();
 		setEventMessages($changed.' account(s) updated.', null);
@@ -120,9 +129,9 @@ if ($pcgversion !== '') {
 		$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
 		$rows = array();
 		foreach ($accounts['byRowid'] as $acc) {
-			$rows[] = array($acc->account_number, $acc->label, $acc->pcg_type, (string) $acc->nature, (string) $acc->nature_alt, (int) $acc->contra, (string) $acc->source);
+			$rows[] = array($acc->account_number, $acc->label, $acc->pcg_type, (string) $acc->nature, (string) $acc->nature_alt, (int) $acc->contra, (string) $acc->source, (string) $acc->cf_class);
 		}
-		anychartlab_send_csv('anychartlab-natures-'.$pcgversion, array('account_number', 'label', 'pcg_type', 'nature', 'nature_alt', 'contra', 'source'), $rows);
+		anychartlab_send_csv('anychartlab-natures-'.$pcgversion, array('account_number', 'label', 'pcg_type', 'nature', 'nature_alt', 'contra', 'source', 'cf_class'), $rows);
 	}
 
 	if ($action === 'import' && !empty($_FILES['importfile']['tmp_name'])) {
@@ -161,6 +170,9 @@ if ($pcgversion !== '') {
 				continue;
 			}
 			anychartlab_save_nature($db, $user, $entity, (int) $acc->rowid, ($nature ?: null), ($alt ?: null), $contra, 'import');
+			if (isset($header['cf_class'])) {
+				anychartlab_save_cf_class($db, $user, $entity, (int) $acc->rowid, strtoupper(trim((string) ($cols[$header['cf_class']] ?? ''))));
+			}
 			$done++;
 		}
 		fclose($fh);
@@ -195,6 +207,7 @@ if ($action === 'reset') {
 }
 
 $accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+$banks = anychartlab_cf_bank_accounts($db, $entity);
 $counts = array('_none' => 0);
 $pcgtypes = array();
 foreach ($accounts['byRowid'] as $acc) {
@@ -255,7 +268,7 @@ print '</div>';
 print '<form method="POST" enctype="multipart/form-data" action="'.$_SERVER['PHP_SELF'].'" style="margin-bottom:12px">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="import">';
-print 'Import a mapping (CSV with columns account_number;nature;nature_alt;contra, as produced by Export): ';
+print 'Import a mapping (CSV with columns account_number;nature;nature_alt;contra and optionally cf_class, as produced by Export): ';
 print '<input type="file" name="importfile" accept=".csv,text/csv"> <input type="submit" class="button small" value="Import">';
 print '</form>';
 
@@ -277,12 +290,12 @@ print '<td><input type="text" class="flat maxwidth100" name="search_account" val
 print '<td></td>';
 print '<td>'.$form->selectarray('search_pcgtype', $pcgtypes, $searchPcgType, 1, 0, 0, '', 0, 0, 0, '', 'maxwidth150').'</td>';
 print '<td>'.$form->selectarray('search_nature', $filterOptions, $searchNature, 1, 0, 0, '', 0, 0, 0, '', 'maxwidth150').'</td>';
-print '<td colspan="'.($showDraft ? 4 : 3).'"><label><input type="checkbox" name="show_draft" value="1"'.($showDraft ? ' checked' : '').'> Show design-draft codes</label> ';
+print '<td colspan="'.($showDraft ? 5 : 4).'"><label><input type="checkbox" name="show_draft" value="1"'.($showDraft ? ' checked' : '').'> Show design-draft codes</label> ';
 print '<input type="submit" class="button small" name="button_search" value="Filter" onclick="this.form.action.value=\'\';"></td>';
 print '</tr>';
 print '<tr class="liste_titre">';
 print '<th class="center"><input type="checkbox" id="checkall" title="Select all"></th>';
-print '<th>Account</th><th>Label</th><th>Group (pcg_type)</th><th>Nature</th><th>Alternate nature</th><th class="center">Contra</th><th>Source</th>';
+print '<th>Account</th><th>Label</th><th>Group (pcg_type)</th><th>Nature</th><th>Alternate nature</th><th class="center">Contra</th><th title="Class of the account in the Cash Flow statement. Auto = suggested from the bank accounts and the label">Cash flow</th><th>Source</th>';
 if ($showDraft) {
 	print '<th>Design-draft code</th>';
 }
@@ -308,6 +321,16 @@ foreach ($accounts['byRowid'] as $acc) {
 	print '<td>'.$form->selectarray('nature['.$acc->rowid.']', $natureOptions, (string) $acc->nature, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100'.($acc->nature === null ? ' error' : '')).'</td>';
 	print '<td>'.$form->selectarray('nature_alt['.$acc->rowid.']', $natureOptions, (string) $acc->nature_alt, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
 	print '<td class="center"><input type="checkbox" name="contra['.$acc->rowid.']" value="1"'.($acc->contra ? ' checked' : '').'></td>';
+	$cfSuggest = anychartlab_cf_suggest($acc, $accounts, $banks, $pcgversion);
+	if ($cfSuggest === 'PL' && empty($acc->cf_class)) {
+		print '<td class="opacitymedium">in the profit</td>';
+	} else {
+		$cfOptions = array('' => 'auto: '.strtolower($cfSuggest === 'PL' ? 'profit' : $cfSuggest));
+		foreach (anychartlab_cf_classes() as $code => $label) {
+			$cfOptions[$code] = $label;
+		}
+		print '<td>'.$form->selectarray('cf_class['.$acc->rowid.']', $cfOptions, (string) $acc->cf_class, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
+	}
 	print '<td class="opacitymedium">'.dol_escape_htmltag((string) $acc->source).'</td>';
 	if ($showDraft) {
 		print '<td>'.dol_escape_htmltag(anychartlab_draft_code($acc)).'</td>';
@@ -315,7 +338,7 @@ foreach ($accounts['byRowid'] as $acc) {
 	print '</tr>';
 }
 if (!$shown) {
-	print '<tr><td colspan="9" class="opacitymedium">No account matches the filter.</td></tr>';
+	print '<tr><td colspan="10" class="opacitymedium">No account matches the filter.</td></tr>';
 }
 print '</table></div>';
 

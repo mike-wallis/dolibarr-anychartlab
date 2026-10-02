@@ -31,7 +31,7 @@ class modAnychartlab extends DolibarrModules
 		$this->picto           = 'accountancy';
 		$this->name            = 'Any-Chart Reports Lab (prototype)';
 		$this->description     = 'PROTOTYPE for Dolibarr issue #31760: classify every account by nature (asset, liability, equity, income, expense…), then build a Balance Sheet and Income Statement that work with any chart of accounts. Export your mapping as CSV to share it.';
-		$this->version         = '0.1';
+		$this->version         = '0.2';
 		$this->const_name      = 'MAIN_MODULE_ANYCHARTLAB';
 		$this->editor_name     = 'Dolibarr User Australia';
 		$this->editor_url      = 'mailto:dolibarruseraustralia@gmail.com';
@@ -55,12 +55,14 @@ class modAnychartlab extends DolibarrModules
 			'user'     => 0,
 		);
 		$pages = array(
-			array('Balance Sheet', 'balancesheet.php', 'anychartlab_bs', 961, 'lire'),
-			array('Income Statement', 'incomestatement.php', 'anychartlab_is', 962, 'lire'),
-			array('Accounts Receivable', 'aged.php?type=ar', 'anychartlab_ar', 963, 'lire'),
-			array('Accounts Payable', 'aged.php?type=ap', 'anychartlab_ap', 964, 'lire'),
+			array('Trial Balance', 'trialbalance.php', 'anychartlab_tb', 961, 'lire'),
+			array('Balance Sheet', 'balancesheet.php', 'anychartlab_bs', 962, 'lire'),
+			array('Income Statement', 'incomestatement.php', 'anychartlab_is', 963, 'lire'),
+			array('Cash Flow', 'cashflow.php', 'anychartlab_cf', 964, 'lire'),
+			array('Accounts Receivable', 'aged.php?type=ar', 'anychartlab_ar', 965, 'lire'),
+			array('Accounts Payable', 'aged.php?type=ap', 'anychartlab_ap', 966, 'lire'),
 			// "Setup" opens a sub-menu: its pages are only listed once it has been clicked
-			array('Setup', 'admin/setup.php', 'anychartlab_setupmenu', 966, 'setup'),
+			array('Setup', 'admin/setup.php', 'anychartlab_setupmenu', 967, 'setup'),
 		);
 		foreach ($pages as $p) {
 			$this->menu[$r++] = array(
@@ -79,10 +81,10 @@ class modAnychartlab extends DolibarrModules
 			);
 		}
 		$setupPages = array(
-			array('Account natures', 'admin/setup.php', 'anychartlab_setup', 967),
-			array('Classification check', 'check.php', 'anychartlab_check', 968),
-			array('Layouts', 'admin/layouts.php', 'anychartlab_layouts', 969),
-			array('Display', 'admin/display.php', 'anychartlab_display', 970),
+			array('Account natures', 'admin/setup.php', 'anychartlab_setup', 968),
+			array('Classification check', 'check.php', 'anychartlab_check', 969),
+			array('Layouts', 'admin/layouts.php', 'anychartlab_layouts', 970),
+			array('Display', 'admin/display.php', 'anychartlab_display', 971),
 		);
 		foreach ($setupPages as $p) {
 			$this->menu[$r++] = array(
