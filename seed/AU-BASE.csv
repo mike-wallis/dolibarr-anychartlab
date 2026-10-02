@@ -1,0 +1,7 @@
+# Any-Chart Reports Lab: rules for AU-BASE (Australia). Most specific first; first match wins.
+# Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+ASSET;1301|1321|1331;;ASSET;;1;Accumulated depreciation: contra-asset
+ASSET;1200;;ASSET;LIABILITY;0;GST paid: asset, shown as liability if in credit
+LIABILITY;2100;;LIABILITY;ASSET;0;GST collected: liability, shown as asset if in debit (refund due)
+ASSET;;;ASSET;LIABILITY;0;Bank and other assets: liability when in credit (overdraft)

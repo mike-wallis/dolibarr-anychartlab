@@ -1,0 +1,10 @@
+# Any-Chart Reports Lab: rules for US-BASE (United States). Most specific first; first match wins.
+# Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+ASSETS;1150|1700|1710|1720|1730|1740|1750|1910;;ASSET;;1;Allowance for doubtful accounts, accumulated depreciation/amortization: contra-asset
+INCOME;4800|4900;;INCOME;;1;Sales returns and discounts: contra-income
+COGS;5900|5950;;EXPENSE;;1;Purchase returns and discounts: contra-expense
+CAPITAL;;;EQUITY;;0;In US-BASE, CAPITAL is owner's equity
+OTHER_REVENUE;;;INCOME;EXPENSE;0;
+OTHER_EXPENSES;;;EXPENSE;INCOME;0;
+ASSETS;;;ASSET;LIABILITY;0;Bank and other assets: liability when in credit (overdraft)

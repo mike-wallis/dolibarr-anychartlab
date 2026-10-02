@@ -1,0 +1,35 @@
+# France (PCG): Compte de résultat par nature (exploitation, financier, exceptionnel), à faire vérifier par des utilisateurs français
+layout_code;layout_label;statement;country;position;code;label;type;natures;accounts;formula;sign;explicit_accounts
+FR-CR;Compte de résultat (France, PCG);IS;FR;10;H_EXPL;Exploitation;heading;;;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;20;VENTES;Chiffre d'affaires (ventes de marchandises, production vendue);group;INCOME;70;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;30;PROD_STOCKEE;Production stockée;group;INCOME|EXPENSE;71;;cd;
+FR-CR;Compte de résultat (France, PCG);IS;FR;40;PROD_IMMO;Production immobilisée;group;INCOME;72;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;50;SUBV_EXPL;Subventions d'exploitation;group;INCOME;74;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;60;REPRISES_EXPL;Reprises sur amortissements, dépréciations et provisions, transferts de charges;group;INCOME;781,791;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;70;AUTRES_PROD;Autres produits;group;INCOME;75;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;80;TOT_PROD_EXPL;Total produits d'exploitation;formula;;;VENTES+PROD_STOCKEE+PROD_IMMO+SUBV_EXPL+REPRISES_EXPL+AUTRES_PROD;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;90;ACHATS_MARCH;Achats de marchandises (y compris variation de stocks);group;EXPENSE|INCOME;607,6037,6087,6097;;dc;
+FR-CR;Compte de résultat (France, PCG);IS;FR;100;ACHATS_MP;Achats de matières premières et approvisionnements (y compris variation de stocks);group;EXPENSE|INCOME;601,602,6031,6032,6081,6082,6091,6092;;dc;
+FR-CR;Compte de résultat (France, PCG);IS;FR;110;CHARGES_EXT;Autres achats et charges externes;group;EXPENSE;60,61,62;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;120;IMPOTS_TAXES;Impôts, taxes et versements assimilés;group;EXPENSE;63;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;130;SALAIRES;Salaires et traitements;group;EXPENSE;641,644;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;140;CHARGES_SOC;Charges sociales;group;EXPENSE;645,646,647,648;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;150;DOTATIONS_EXPL;Dotations aux amortissements, dépréciations et provisions;group;EXPENSE;681;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;160;AUTRES_CHARGES;Autres charges;group;EXPENSE;65;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;170;TOT_CHARGES_EXPL;Total charges d'exploitation;formula;;;ACHATS_MARCH+ACHATS_MP+CHARGES_EXT+IMPOTS_TAXES+SALAIRES+CHARGES_SOC+DOTATIONS_EXPL+AUTRES_CHARGES;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;180;RES_EXPL;RÉSULTAT D'EXPLOITATION;formula;;;TOT_PROD_EXPL-TOT_CHARGES_EXPL;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;190;H_FIN;Financier;heading;;;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;200;PROD_FIN;Produits financiers;group;INCOME;76,786,796;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;210;CHARGES_FIN;Charges financières;group;EXPENSE;66,686;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;220;RES_FIN;RÉSULTAT FINANCIER;formula;;;PROD_FIN-CHARGES_FIN;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;230;RES_COURANT;RÉSULTAT COURANT AVANT IMPÔTS;formula;;;RES_EXPL+RES_FIN;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;240;H_EXC;Exceptionnel;heading;;;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;250;PROD_EXC;Produits exceptionnels;group;INCOME;77,787,797;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;260;CHARGES_EXC;Charges exceptionnelles;group;EXPENSE;67,687;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;270;RES_EXC;RÉSULTAT EXCEPTIONNEL;formula;;;PROD_EXC-CHARGES_EXC;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;280;PARTICIPATION;Participation des salariés aux résultats;group;EXPENSE;691;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;290;IMPOT_BEN;Impôts sur les bénéfices;group;EXPENSE|INCOME;69;;dc;
+FR-CR;Compte de résultat (France, PCG);IS;FR;300;AUTRES_PROD_DIV;Autres produits non classés;group;INCOME;;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;310;AUTRES_CHARGES_DIV;Autres charges non classées;group;EXPENSE;;;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;320;RESULTAT;BÉNÉFICE OU PERTE;formula;;;RES_COURANT+RES_EXC-PARTICIPATION-IMPOT_BEN+AUTRES_PROD_DIV-AUTRES_CHARGES_DIV;natural;
+FR-CR;Compte de résultat (France, PCG);IS;FR;330;CONTROLE;Contrôle : résultat - résultat par nature (doit être 0);formula;;;RESULTAT-RESULT;natural;

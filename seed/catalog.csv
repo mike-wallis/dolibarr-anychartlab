@@ -1,0 +1,14 @@
+# Any-Chart Reports Lab: what the module ships, and which country / charts each file suits.
+# Used to suggest a rule set and layouts from the company country (Setup > Company) and the active chart.
+# kind: nature (rule file in seed/) or layout (file in seed/layouts/). charts: chart codes separated by |
+# country: only for countries with a national standard numbering (e.g. France's PCG), so a file is never
+# suggested by country for a custom chart whose numbers mean something else (e.g. Australia, US).
+kind;file;country;charts;label
+nature;AU-BASE.csv;;AU-BASE;Australia (AU-BASE)
+nature;US-BASE.csv;;US-BASE;United States (US-BASE)
+nature;US-GAAP-BASIC.csv;;US-GAAP-BASIC;United States (US-GAAP-BASIC)
+nature;FR-PCG.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;France - Plan comptable general (PCG)
+layout;AU-BASE-balance-sheet.csv;;AU-BASE;Balance Sheet (Australia, AU-BASE)
+layout;AU-BASE-income-statement.csv;;AU-BASE;Income Statement (Australia, AU-BASE)
+layout;FR-PCG-bilan.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;Bilan (France, PCG)
+layout;FR-PCG-compte-de-resultat.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;Compte de resultat (France, PCG)

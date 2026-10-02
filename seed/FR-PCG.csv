@@ -1,0 +1,47 @@
+# Any-Chart Reports Lab: France, Plan comptable general (PCG) and charts using its numbering
+# (PCG25-DEV, PCG18-ASSOC, PCGAFR14-DEV, PCG99-BASE-NC, PCG99-ABREGE-NC). By account number,
+# most specific first; first match wins. To be checked by French users (see #31760).
+# Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+;109;;EQUITY;;1;Capital souscrit non appele: deduction des capitaux propres
+;10|11|12|13|14;;EQUITY;;0;Capital, reserves, report a nouveau, resultat, subventions, provisions reglementees
+;15;;LIABILITY;;0;Provisions pour risques et charges
+;16|17;;LIABILITY;;0;Emprunts et dettes assimilees, dettes rattachees a des participations
+;18;;CLEARING;;0;Comptes de liaison des etablissements
+;19;;LIABILITY;;0;Fonds dedies (associations)
+;1;;EQUITY;;0;Autres comptes de classe 1 (en-tetes de classe)
+;28|29;;ASSET;;1;Amortissements et depreciations des immobilisations
+;2;;ASSET;;0;Immobilisations
+;39;;ASSET;;1;Depreciations des stocks
+;3;;ASSET;;0;Stocks et en-cours
+;409;;ASSET;LIABILITY;0;Fournisseurs debiteurs (avances et acomptes verses)
+;419;;LIABILITY;ASSET;0;Clients crediteurs (avances recues)
+;40;;LIABILITY;ASSET;0;Fournisseurs: au passif, a l'actif s'ils sont debiteurs
+;41;;ASSET;LIABILITY;0;Clients: a l'actif, au passif s'ils sont crediteurs
+;425|4287;;ASSET;LIABILITY;0;Avances au personnel, produits a recevoir
+;42;;LIABILITY;ASSET;0;Personnel
+;4387;;ASSET;LIABILITY;0;Organismes sociaux, produits a recevoir
+;43;;LIABILITY;ASSET;0;Securite sociale et organismes sociaux
+;4456|441|4487;;ASSET;LIABILITY;0;TVA deductible, credit de TVA, Etat subventions et produits a recevoir
+;44;;LIABILITY;ASSET;0;Etat et collectivites (TVA collectee, impots): au passif, a l'actif si debiteurs
+;45;;LIABILITY;ASSET;0;Groupe et associes (comptes courants)
+;46;;ASSET;LIABILITY;0;Debiteurs et crediteurs divers
+;476;;ASSET;;0;Ecarts de conversion actif
+;477;;LIABILITY;;0;Ecarts de conversion passif
+;47;;CLEARING;;0;Comptes transitoires ou d'attente
+;487;;LIABILITY;;0;Produits constates d'avance
+;48;;ASSET;LIABILITY;0;Charges a repartir, charges constatees d'avance, comptes de regularisation
+;49;;ASSET;;1;Depreciations des comptes de tiers
+;4;;ASSET;LIABILITY;0;Autres comptes de tiers (en-tetes de classe)
+;509|519;;LIABILITY;;0;Versements restant a effectuer sur VMP, concours bancaires courants
+;58;;CLEARING;;0;Virements internes
+;59;;ASSET;;1;Depreciations des comptes financiers
+;51|52;;ASSET;LIABILITY;0;Banques: au passif si le solde est crediteur (decouvert)
+;5;;ASSET;;0;Valeurs mobilieres, caisse
+;609|619|629;;EXPENSE;;1;Rabais, remises et ristournes obtenus
+;603;;EXPENSE;INCOME;0;Variation des stocks (peut etre crediteur)
+;6;;EXPENSE;;0;Charges
+;709;;INCOME;;1;Rabais, remises et ristournes accordes
+;713;;INCOME;EXPENSE;0;Variation des stocks produits (peut etre debiteur)
+;7;;INCOME;;0;Produits
+;8|9;;EXCLUDED;;0;Comptes speciaux (engagements, bilan d'ouverture et de cloture), comptabilite analytique

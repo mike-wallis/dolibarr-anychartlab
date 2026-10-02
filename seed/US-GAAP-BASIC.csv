@@ -1,0 +1,12 @@
+# Any-Chart Reports Lab: rules for US-GAAP-BASIC. Most specific first; first match wins.
+# Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+EQUITY;343;;EQUITY;;1;Treasury stock: contra-equity
+EQUITY;324;;CLEARING;;0;In suspense
+OTHER_INCOME_EXPENSES;;;EXPENSE;INCOME;0;Other income/expenses: income when in credit
+INTERCOMPANY_RELPARTY_ACCOUNTS;71;;ASSET;LIABILITY;0;Intercompany assets
+INTERCOMPANY_RELPARTY_ACCOUNTS;72;;LIABILITY;ASSET;0;Intercompany liabilities
+INTERCOMPANY_RELPARTY_ACCOUNTS;731;;INCOME;;0;
+INTERCOMPANY_RELPARTY_ACCOUNTS;732;;EXPENSE;;0;
+INTERCOMPANY_RELPARTY_ACCOUNTS;733;;INCOME;EXPENSE;0;Income (loss) from equity method investments
+INTERCOMPANY_RELPARTY_ACCOUNTS;7;;EXCLUDED;;0;Group headings 7, 71, 72, 73 have no postings

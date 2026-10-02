@@ -1,0 +1,13 @@
+# Any-Chart Reports Lab: GENERIC rules, applied to every chart (including custom charts)
+# after the chart's own rules, only to accounts still unclassified.
+# Only pcg_type values that mean the same thing in every shipped chart are listed.
+# Deliberately NOT listed: CAPITAL (equity in US/CA, equity + long-term debt in AD/ES-CAT),
+# and mixed groups such as CAPIT, THIRDPARTY, FINAN: those need per-chart rules.
+# Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+# Several values in a match column are separated by |. Empty match column = any.
+pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
+ASSET|ASSETS;;;ASSET;;0;
+LIABILITY|LIABILITIES;;;LIABILITY;;0;
+EQUITY;;;EQUITY;;0;
+INCOME|REVENUE;;;INCOME;;0;
+EXPENSE|EXPENSES|COGS;;;EXPENSE;;0;

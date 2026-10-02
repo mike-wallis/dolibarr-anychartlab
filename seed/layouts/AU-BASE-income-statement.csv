@@ -1,0 +1,10 @@
+# Australia (AU-BASE numbering): Income Statement with gross profit
+layout_code;layout_label;statement;country;position;code;label;type;natures;accounts;formula;sign;explicit_accounts
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;10;REVENUE;Revenue;group;INCOME;40;;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;20;COGS;Cost of sales;group;EXPENSE;5;;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;30;GROSS;Gross profit;formula;;;REVENUE-COGS;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;40;OTHINC;Other income;group;INCOME;;;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;50;OPEX;Operating expenses;group;EXPENSE;6;;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;60;OTHEXP;Other expenses;group;EXPENSE;;;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;70;NET;NET PROFIT;formula;;;GROSS+OTHINC-OPEX-OTHEXP;natural;
+AU-IS;Income Statement (Australia, AU-BASE);IS;AU;80;CHECK;Check: net profit - result by nature (should be 0);formula;;;NET-RESULT;natural;

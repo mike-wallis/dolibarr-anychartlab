@@ -1,0 +1,26 @@
+# Australia (AU-BASE numbering): Balance Sheet with current / non-current split
+layout_code;layout_label;statement;country;position;code;label;type;natures;accounts;formula;sign;explicit_accounts
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;10;H_CA;Current assets;heading;;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;20;CASH;Cash and cash equivalents;group;ASSET;100,101,102,103;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;30;RECEIV;Trade and other receivables;group;ASSET;11,123;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;40;OTHCA;Other current assets;group;ASSET;12;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;50;TOTCA;Total current assets;formula;;;CASH+RECEIV+OTHCA;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;60;H_NCA;Non-current assets;heading;;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;70;PPE;Property, plant and equipment (net of depreciation);group;ASSET;13;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;80;OTHNCA;Other non-current assets;group;ASSET;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;90;TOTNCA;Total non-current assets;formula;;;PPE+OTHNCA;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;100;TOTASSETS;TOTAL ASSETS;formula;;;TOTCA+TOTNCA;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;110;H_CL;Current liabilities;heading;;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;120;PAYABLES;Trade and other payables;group;LIABILITY;20,214,217;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;130;TAXEMP;Tax and employee liabilities;group;LIABILITY;21;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;140;TOTCL;Total current liabilities;formula;;;PAYABLES+TAXEMP;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;150;H_NCL;Non-current liabilities;heading;;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;160;BORROW;Borrowings;group;LIABILITY;22;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;170;OTHLIAB;Other liabilities;group;LIABILITY;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;180;TOTNCL;Total non-current liabilities;formula;;;BORROW+OTHLIAB;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;190;TOTLIAB;TOTAL LIABILITIES;formula;;;TOTCL+TOTNCL;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;200;NETASSETS;NET ASSETS;formula;;;TOTASSETS-TOTLIAB;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;210;H_EQ;Equity;heading;;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;220;CAPITAL;Owner's capital and retained earnings;group;EQUITY;;;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;230;CYE;Current year earnings (unclosed periods);formula;;;RESULT;natural;
+AU-BS;Balance Sheet (Australia, AU-BASE);BS;AU;240;TOTEQ;TOTAL EQUITY;formula;;;CAPITAL+CYE;natural;
