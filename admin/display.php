@@ -1,7 +1,7 @@
 <?php
 /**
- * Any-Chart Reports Lab — display settings (PDF look, number format, screen
- * indent and report defaults). Stored as module constants ANYCHARTLAB_*.
+ * Financial Reporting — display settings (PDF look, number format, screen
+ * indent and report defaults). Stored as module constants FINANCIALREPORTING_*.
  */
 
 $res = 0;
@@ -15,14 +15,17 @@ if (!$res) {
 	die('Include of main fails');
 }
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once dirname(__DIR__).'/lib/anychartlab.lib.php';
+require_once dirname(__DIR__).'/lib/financialreporting.lib.php';
 
-if (!$user->hasRight('anychartlab', 'setup') && !$user->admin) {
+if (!isModEnabled('financialreporting')) {
+	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
+}
+if (!$user->hasRight('financialreporting', 'setup') && !$user->admin) {
 	accessforbidden();
 }
 
 $action = GETPOST('action', 'aZ09');
-$defaults = anychartlab_display_defaults();
+$defaults = financialreporting_display_defaults();
 
 // Field definitions: key => array(type, label, options/help)
 $fonts = array('' => 'Dolibarr default PDF font', 'helvetica' => 'Helvetica', 'times' => 'Times', 'courier' => 'Courier', 'dejavusans' => 'DejaVu Sans (wide character support)', 'freesans' => 'FreeSans');
@@ -55,6 +58,10 @@ $sections = array(
 	'Numbers (screen and PDF)' => array(
 		'NEG_FORMAT' => array('select', 'Negative amounts', array('minus' => '-1,234.56', 'paren' => '(1,234.56)')),
 		'DECIMALS' => array('select', 'Decimals', array('2' => '2 decimals (1,234.56)', '0' => 'Whole units (1,235)')),
+	),
+	'Balance Sheet' => array(
+		'BS_ORDER' => array('select', 'Order of the account classes', array('' => 'By company country (current first in AU, US, CA, NZ; non-current first elsewhere)', 'current' => 'Current first (cash, current, non-current)', 'noncurrent' => 'Non-current first (non-current, current, cash): IFRS examples, EU, France, OHADA')),
+		'DEFAULT_BS_SPLIT' => array('yesno', 'Split by class', 'Without a layout: current / non-current / cash blocks with their totals'),
 	),
 	'Accounts Receivable / Payable' => array(
 		'AGED_ORDER' => array('select', 'Ageing columns', array('oldest' => 'Oldest first (90+, 61-90, 31-60, 1-30, not due)', 'newest' => 'Newest first (not due, 1-30, 31-60, 61-90, 90+)')),
@@ -93,12 +100,12 @@ if ($action === 'save') {
 			if ($def[0] === 'text' && $val === '' && $defaults[$key] !== '') {
 				$val = ' ';
 			}
-			if (dolibarr_set_const($db, 'ANYCHARTLAB_'.$key, $val, 'chaine', 0, 'Any-Chart Reports Lab display setting', $conf->entity) < 0) {
+			if (dolibarr_set_const($db, 'FINANCIALREPORTING_'.$key, $val, 'chaine', 0, 'Financial Reporting display setting', $conf->entity) < 0) {
 				$error++;
 			}
 		}
 	}
-	foreach (anychartlab_style_kinds() as $kind => $klabel) {
+	foreach (financialreporting_style_kinds() as $kind => $klabel) {
 		$st = array(
 			'font' => (array_key_exists(GETPOST('st_'.$kind.'_font', 'alphanohtml'), $fonts) ? GETPOST('st_'.$kind.'_font', 'alphanohtml') : ''),
 			'size' => (float) price2num(GETPOST('st_'.$kind.'_size', 'alphanohtml')),
@@ -110,7 +117,7 @@ if ($action === 'save') {
 			'shade' => GETPOSTINT('st_'.$kind.'_shade') ? 1 : 0,
 			'colour' => (preg_match('/^#?[0-9a-fA-F]{6}$/', GETPOST('st_'.$kind.'_colour', 'alphanohtml')) ? '#'.ltrim(GETPOST('st_'.$kind.'_colour', 'alphanohtml'), '#') : '#000000'),
 		);
-		if (dolibarr_set_const($db, 'ANYCHARTLAB_STYLE_'.strtoupper($kind), json_encode($st), 'chaine', 0, 'Any-Chart Reports Lab line style', $conf->entity) < 0) {
+		if (dolibarr_set_const($db, 'FINANCIALREPORTING_STYLE_'.strtoupper($kind), json_encode($st), 'chaine', 0, 'Financial Reporting line style', $conf->entity) < 0) {
 			$error++;
 		}
 	}
@@ -120,10 +127,10 @@ if ($action === 'save') {
 }
 if ($action === 'reset') {
 	foreach ($defaults as $key => $v) {
-		dolibarr_del_const($db, 'ANYCHARTLAB_'.$key, $conf->entity);
+		dolibarr_del_const($db, 'FINANCIALREPORTING_'.$key, $conf->entity);
 	}
-	foreach (anychartlab_style_kinds() as $kind => $klabel) {
-		dolibarr_del_const($db, 'ANYCHARTLAB_STYLE_'.strtoupper($kind), $conf->entity);
+	foreach (financialreporting_style_kinds() as $kind => $klabel) {
+		dolibarr_del_const($db, 'FINANCIALREPORTING_STYLE_'.strtoupper($kind), $conf->entity);
 	}
 	setEventMessages('Display settings reset to the defaults.', null);
 	header('Location: '.$_SERVER['PHP_SELF']);
@@ -135,12 +142,12 @@ if ($action === 'reset') {
  */
 
 $form = new Form($db);
-llxHeader('', 'Display settings', '', '', 0, 0, '', '', '', 'mod-anychartlab page-display');
+llxHeader('', 'Display settings', '', '', 0, 0, '', '', '', 'mod-financialreporting page-display');
 print load_fiche_titre('Display settings', '', 'accountancy');
-anychartlab_print_nav('admin/display.php', anychartlab_active_chart($db));
+financialreporting_print_nav('admin/display.php', financialreporting_active_chart($db));
 
-$bs = dol_buildpath('/anychartlab/balancesheet.php', 1);
-$is = dol_buildpath('/anychartlab/incomestatement.php', 1);
+$bs = dol_buildpath('/financialreporting/balancesheet.php', 1);
+$is = dol_buildpath('/financialreporting/incomestatement.php', 1);
 print '<div class="info">How the Balance Sheet and Income Statement look, on screen and in PDF. Save, then try <a href="'.$bs.'?action=pdfpreview&token='.newToken().'" target="_blank">Preview PDF of the Balance Sheet</a> or <a href="'.$is.'?action=pdfpreview&token='.newToken().'" target="_blank">of the Income Statement</a> (current options; layouts and other report options are chosen on the report pages).</div>';
 
 print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
@@ -150,7 +157,7 @@ print '<table class="noborder centpercent">';
 foreach ($sections as $title => $fields) {
 	print '<tr class="liste_titre"><th colspan="3">'.dol_escape_htmltag($title).'</th></tr>';
 	foreach ($fields as $key => $def) {
-		$val = anychartlab_cfg($key);
+		$val = financialreporting_cfg($key);
 		print '<tr class="oddeven"><td class="titlefieldcreate">'.dol_escape_htmltag($def[1]).'</td><td>';
 		if ($def[0] === 'yesno') {
 			print '<input type="checkbox" name="'.$key.'" value="1"'.($val === '1' ? ' checked' : '').'>';
@@ -168,13 +175,13 @@ foreach ($sections as $title => $fields) {
 print '</table><br>';
 
 // Line styles grid (screen and PDF)
-$styleDefaults = anychartlab_style_defaults();
+$styleDefaults = financialreporting_style_defaults();
 $lineOptions = array('none' => 'None', 'amount' => 'Over amount', 'full' => 'Full width', 'double' => 'Double');
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre"><th colspan="10">Line styles (screen and PDF)</th></tr>';
 print '<tr class="liste_titre"><th>Kind of line</th><th>Font</th><th class="center">Size ±pt</th><th class="center">Bold</th><th class="center">Italic</th><th class="center">Upper case</th><th class="center">Indent mm</th><th>Rule above</th><th class="center">Shaded</th><th>Colour</th></tr>';
-foreach (anychartlab_style_kinds() as $kind => $klabel) {
-	$st = anychartlab_style($kind);
+foreach (financialreporting_style_kinds() as $kind => $klabel) {
+	$st = financialreporting_style($kind);
 	$changed = ($st != $styleDefaults[$kind]);
 	print '<tr class="oddeven"><td>'.dol_escape_htmltag($klabel).($changed ? ' <span class="badge badge-info">changed</span>' : '').'</td>';
 	print '<td>'.$form->selectarray('st_'.$kind.'_font', array('' => 'Report font') + array_slice($fonts, 1, null, true), $st['font'], 0, 0, 0, '', 0, 0, 0, '', 'maxwidth150').'</td>';

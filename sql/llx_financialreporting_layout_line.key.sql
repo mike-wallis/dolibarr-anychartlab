@@ -1,0 +1,1 @@
+ALTER TABLE llx_financialreporting_layout_line ADD INDEX idx_financialreporting_layout_line_layout (fk_layout);

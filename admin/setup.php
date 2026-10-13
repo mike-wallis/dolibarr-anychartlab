@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — account natures (setup).
+ * Financial Reporting — account natures (setup).
  *
  * Lists every account of the active chart with its nature, alternate nature,
  * contra flag and where the value came from. Lets the user:
@@ -20,10 +20,13 @@ if (!$res && is_file('../../../main.inc.php')) {
 if (!$res) {
 	die('Include of main fails');
 }
-require_once dirname(__DIR__).'/lib/anychartlab.lib.php';
+require_once dirname(__DIR__).'/lib/financialreporting.lib.php';
 require_once dirname(__DIR__).'/lib/cashflow.lib.php';
 
-if (!$user->hasRight('anychartlab', 'setup') && !$user->admin) {
+if (!isModEnabled('financialreporting')) {
+	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
+}
+if (!$user->hasRight('financialreporting', 'setup') && !$user->admin) {
 	accessforbidden();
 }
 
@@ -40,8 +43,8 @@ if ($searchPcgType === '-1') {
 }
 
 $entity = (int) $conf->entity;
-$pcgversion = anychartlab_active_chart($db);
-$natures = anychartlab_natures();
+$pcgversion = financialreporting_active_chart($db);
+$natures = financialreporting_natures();
 $backparams = 'search_nature='.urlencode($searchNature).'&search_pcgtype='.urlencode($searchPcgType).'&search_account='.urlencode($searchAccount).'&show_draft='.$showDraft;
 
 /*
@@ -54,17 +57,18 @@ if ($pcgversion !== '') {
 		if ($ruleFile !== null && $ruleFile === '_generic') {
 			$ruleFile = '';
 		}
-		$c = anychartlab_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile);
+		$c = financialreporting_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile);
+		financialreporting_apply_default_classes($db, $user, $entity, $pcgversion);	// classes follow natures (never overwrites one already set)
 		if ($action === 'suggest') {
 			require_once dirname(__DIR__).'/lib/layout.lib.php';
 			$existing = array();
-			foreach (anychartlab_layouts_list($db, $entity) as $lo) {
+			foreach (financialreporting_layouts_list($db, $entity) as $lo) {
 				$existing[$lo->source_ref] = 1;
 			}
 			$loaded = array();
-			foreach (anychartlab_suggest_layouts($pcgversion) as $e) {
+			foreach (financialreporting_suggest_layouts($pcgversion) as $e) {
 				if (!isset($existing[$e['file']])) {
-					$r = anychartlab_layout_import($db, $entity, $pcgversion, anychartlab_layout_read_csv(anychartlab_seed_dir().'/layouts/'.$e['file']), 'file', $e['file']);
+					$r = financialreporting_layout_import($db, $entity, $pcgversion, financialreporting_layout_read_csv(financialreporting_seed_dir().'/layouts/'.$e['file']), 'file', $e['file']);
 					if ($r['created']) {
 						$loaded[] = $e['label'];
 					}
@@ -80,18 +84,19 @@ if ($pcgversion !== '') {
 	}
 
 	if ($action === 'confirm_reset' && GETPOST('confirm', 'alpha') === 'yes') {
-		$n = anychartlab_reset($db, $entity, $pcgversion);
+		$n = financialreporting_reset($db, $entity, $pcgversion);
 		setEventMessages($n.' account natures removed.', null);
 		header('Location: '.$_SERVER['PHP_SELF']);
 		exit;
 	}
 
 	if ($action === 'save') {
-		$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+		$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
 		$postNature = GETPOST('nature', 'array');
 		$postAlt = GETPOST('nature_alt', 'array');
 		$postContra = GETPOST('contra', 'array');
 		$postCf = GETPOST('cf_class', 'array');
+		$postClass = GETPOST('class', 'array');
 		$toselect = GETPOST('toselect', 'array:int');
 		$bulkNature = GETPOST('bulk_nature', 'aZ09');
 		$changed = 0;
@@ -108,13 +113,23 @@ if ($pcgversion !== '') {
 				$nature = ($bulkNature === '_none' ? null : (isset($natures[$bulkNature]) ? $bulkNature : $nature));
 			}
 			if ($nature !== $acc->nature || $alt !== $acc->nature_alt || $contra !== (int) $acc->contra) {
-				anychartlab_save_nature($db, $user, $entity, (int) $rowid, $nature, $alt, $contra, 'manual');
+				financialreporting_save_nature($db, $user, $entity, (int) $rowid, $nature, $alt, $contra, 'manual');
 				$changed++;
 			}
+			// class: kept when it belongs to the (new) nature, else the nature's default, to review
+			$class = (isset($postClass[$rowid]) && $postClass[$rowid] !== '' && $postClass[$rowid] !== '-1' ? $postClass[$rowid] : $acc->class);
+			if ($nature !== null && financialreporting_class_valid($nature, $class)) {
+				if ($class !== $acc->class) {
+					financialreporting_save_class($db, $user, $entity, (int) $rowid, $class, 'manual');
+					$changed++;
+				}
+			} elseif ($nature !== null) {
+				financialreporting_save_class($db, $user, $entity, (int) $rowid, financialreporting_default_class($nature), 'default');
+			}
 			if (isset($postCf[$rowid])) {
-				$cf = (isset(anychartlab_cf_classes()[$postCf[$rowid]]) ? $postCf[$rowid] : null);
+				$cf = (isset(financialreporting_cf_classes()[$postCf[$rowid]]) ? $postCf[$rowid] : null);
 				if ($cf !== $acc->cf_class) {
-					anychartlab_save_cf_class($db, $user, $entity, (int) $rowid, $cf);
+					financialreporting_save_cf_class($db, $user, $entity, (int) $rowid, $cf);
 					$changed++;
 				}
 			}
@@ -126,16 +141,16 @@ if ($pcgversion !== '') {
 	}
 
 	if ($action === 'export') {
-		$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+		$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
 		$rows = array();
 		foreach ($accounts['byRowid'] as $acc) {
-			$rows[] = array($acc->account_number, $acc->label, $acc->pcg_type, (string) $acc->nature, (string) $acc->nature_alt, (int) $acc->contra, (string) $acc->source, (string) $acc->cf_class);
+			$rows[] = array($acc->account_number, $acc->label, $acc->pcg_type, (string) $acc->nature, (string) $acc->nature_alt, (int) $acc->contra, (string) $acc->source, (string) $acc->cf_class, (string) financialreporting_account_class($acc));
 		}
-		anychartlab_send_csv('anychartlab-natures-'.$pcgversion, array('account_number', 'label', 'pcg_type', 'nature', 'nature_alt', 'contra', 'source', 'cf_class'), $rows);
+		financialreporting_send_csv('financialreporting-natures-'.$pcgversion, array('account_number', 'label', 'pcg_type', 'nature', 'nature_alt', 'contra', 'source', 'cf_class', 'class'), $rows);
 	}
 
 	if ($action === 'import' && !empty($_FILES['importfile']['tmp_name'])) {
-		$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+		$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
 		$fh = fopen($_FILES['importfile']['tmp_name'], 'r');
 		$header = null;
 		$done = 0;
@@ -169,9 +184,13 @@ if ($pcgversion !== '') {
 				$invalid[] = $number;
 				continue;
 			}
-			anychartlab_save_nature($db, $user, $entity, (int) $acc->rowid, ($nature ?: null), ($alt ?: null), $contra, 'import');
+			financialreporting_save_nature($db, $user, $entity, (int) $acc->rowid, ($nature ?: null), ($alt ?: null), $contra, 'import');
 			if (isset($header['cf_class'])) {
-				anychartlab_save_cf_class($db, $user, $entity, (int) $acc->rowid, strtoupper(trim((string) ($cols[$header['cf_class']] ?? ''))));
+				financialreporting_save_cf_class($db, $user, $entity, (int) $acc->rowid, strtoupper(trim((string) ($cols[$header['cf_class']] ?? ''))));
+			}
+			$impClass = (isset($header['class']) ? strtoupper(trim((string) ($cols[$header['class']] ?? ''))) : '');
+			if ($nature !== '' && financialreporting_class_valid($nature, $impClass)) {
+				financialreporting_save_class($db, $user, $entity, (int) $acc->rowid, $impClass, 'import');
 			}
 			$done++;
 		}
@@ -190,10 +209,10 @@ if ($pcgversion !== '') {
  */
 
 $form = new Form($db);
-llxHeader('', 'Account natures', '', '', 0, 0, '', '', '', 'mod-anychartlab page-setup');
+llxHeader('', 'Account natures', '', '', 0, 0, '', '', '', 'mod-financialreporting page-setup');
 
 print load_fiche_titre('Account natures', '', 'accountancy');
-anychartlab_print_nav('admin/setup.php', $pcgversion);
+financialreporting_print_nav('admin/setup.php', $pcgversion);
 
 if ($pcgversion === '') {
 	print '<div class="warning">No chart of accounts is selected. Choose one in Accounting &gt; Setup &gt; Chart of accounts first.</div>';
@@ -206,8 +225,8 @@ if ($action === 'reset') {
 	print $form->formconfirm($_SERVER['PHP_SELF'], 'Reset all natures', 'Remove the nature of every account of chart '.dol_escape_htmltag($pcgversion).'? Nothing in the accounting itself is changed.', 'confirm_reset', '', 0, 1);
 }
 
-$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
-$banks = anychartlab_cf_bank_accounts($db, $entity);
+$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
+$banks = financialreporting_cf_bank_accounts($db, $entity);
 $counts = array('_none' => 0);
 $pcgtypes = array();
 foreach ($accounts['byRowid'] as $acc) {
@@ -224,10 +243,10 @@ foreach ($accounts['byRowid'] as $acc) {
 	}
 }
 if ($classified === 0) {
-	$sug = anychartlab_suggest_ruleset($pcgversion);
-	$sugLayouts = anychartlab_suggest_layouts($pcgversion);
+	$sug = financialreporting_suggest_ruleset($pcgversion);
+	$sugLayouts = financialreporting_suggest_layouts($pcgversion);
 	print '<div class="info" style="border-left:4px solid #2a7">';
-	print '<b>Detected:</b> company country <b>'.dol_escape_htmltag(anychartlab_country_code() ?: '?').'</b>, chart <b>'.dol_escape_htmltag($pcgversion).'</b>.<br>';
+	print '<b>Detected:</b> company country <b>'.dol_escape_htmltag(financialreporting_country_code() ?: '?').'</b>, chart <b>'.dol_escape_htmltag($pcgversion).'</b>.<br>';
 	print '<b>Suggested:</b> rule set <b>'.dol_escape_htmltag($sug ? $sug['label'] : 'generic rules only').'</b>';
 	if ($sugLayouts) {
 		print ', layouts <b>'.dol_escape_htmltag(implode(', ', array_map(function ($e) {
@@ -252,15 +271,15 @@ print '<p>'.count($accounts['byRowid']).' accounts in chart <b>'.dol_escape_html
 
 // Toolbar
 print '<div class="tabsAction" style="text-align:left">';
-$suggestion = anychartlab_suggest_ruleset($pcgversion);
+$suggestion = financialreporting_suggest_ruleset($pcgversion);
 $rulesetOptions = array('_generic' => 'Generic rules only');
-foreach (anychartlab_catalog_ranked('nature', $pcgversion) as $e) {
+foreach (financialreporting_catalog_ranked('nature', $pcgversion) as $e) {
 	$rulesetOptions[$e['file']] = $e['label'].($e['match'] === 'chart' ? ' (made for chart '.$pcgversion.')' : ($e['match'] === 'country' ? ' (for your country)' : ''));
 }
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'" style="display:inline-block;margin-right:8px">';
 print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="apply">';
 print 'Rule set '.$form->selectarray('ruleset', $rulesetOptions, $suggestion ? $suggestion['file'] : '_generic', 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').' ';
-print '<input type="submit" class="butAction" value="Apply default natures"></form>';
+print '<input type="submit" class="butAction" value="Apply default natures"> <a href="'.dol_buildpath('/financialreporting/admin/rules.php', 1).'">See or edit the rule sets</a></form>';
 print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?action=export&token='.newToken().'">Export mapping (CSV)</a>';
 print '<a class="butActionDelete" href="'.$_SERVER['PHP_SELF'].'?action=reset&token='.newToken().'">Reset all</a>';
 print '</div>';
@@ -268,7 +287,7 @@ print '</div>';
 print '<form method="POST" enctype="multipart/form-data" action="'.$_SERVER['PHP_SELF'].'" style="margin-bottom:12px">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="import">';
-print 'Import a mapping (CSV with columns account_number;nature;nature_alt;contra and optionally cf_class, as produced by Export): ';
+print 'Import a mapping (CSV with columns account_number;nature;nature_alt;contra and optionally cf_class and class, as produced by Export): ';
 print '<input type="file" name="importfile" accept=".csv,text/csv"> <input type="submit" class="button small" value="Import">';
 print '</form>';
 
@@ -295,7 +314,7 @@ print '<input type="submit" class="button small" name="button_search" value="Fil
 print '</tr>';
 print '<tr class="liste_titre">';
 print '<th class="center"><input type="checkbox" id="checkall" title="Select all"></th>';
-print '<th>Account</th><th>Label</th><th>Group (pcg_type)</th><th>Nature</th><th>Alternate nature</th><th class="center">Contra</th><th title="Class of the account in the Cash Flow statement. Auto = suggested from the bank accounts and the label">Cash flow</th><th>Source</th>';
+print '<th>Account</th><th>Label</th><th>Group (pcg_type)</th><th>Nature</th><th>Alternate nature</th><th class="center">Contra</th><th title="Account class: subdivision of the nature (current / non-current, cost of sales, staff costs…). Exactly one per account">Class</th><th title="Class of the account in the Cash Flow statement. Auto = suggested from the bank accounts and the label">Cash flow</th><th>Source</th>';
 if ($showDraft) {
 	print '<th>Design-draft code</th>';
 }
@@ -315,30 +334,40 @@ foreach ($accounts['byRowid'] as $acc) {
 	$shown++;
 	print '<tr class="oddeven">';
 	print '<td class="center"><input type="checkbox" class="checkforselect" name="toselect[]" value="'.$acc->rowid.'"></td>';
-	print '<td class="nowraponall"><a href="'.anychartlab_ledger_url($acc->account_number).'" target="_blank">'.dol_escape_htmltag($acc->account_number).'</a></td>';
+	print '<td class="nowraponall"><a href="'.financialreporting_ledger_url($acc->account_number).'" target="_blank">'.dol_escape_htmltag($acc->account_number).'</a></td>';
 	print '<td class="tdoverflowmax300" title="'.dol_escape_htmltag($acc->label).'">'.dol_escape_htmltag($acc->label).'</td>';
 	print '<td>'.dol_escape_htmltag((string) $acc->pcg_type).'</td>';
 	print '<td>'.$form->selectarray('nature['.$acc->rowid.']', $natureOptions, (string) $acc->nature, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100'.($acc->nature === null ? ' error' : '')).'</td>';
 	print '<td>'.$form->selectarray('nature_alt['.$acc->rowid.']', $natureOptions, (string) $acc->nature_alt, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
 	print '<td class="center"><input type="checkbox" name="contra['.$acc->rowid.']" value="1"'.($acc->contra ? ' checked' : '').'></td>';
-	$cfSuggest = anychartlab_cf_suggest($acc, $accounts, $banks, $pcgversion);
+	if ($acc->nature !== null) {
+		$clOptions = array();
+		foreach (financialreporting_classes_for($acc->nature) as $cl) {
+			$clOptions[$cl] = financialreporting_class_label($cl);
+		}
+		$clCurrent = financialreporting_account_class($acc);
+		print '<td>'.$form->selectarray('class['.$acc->rowid.']', $clOptions, (string) $clCurrent, ($clCurrent === null ? 1 : 0), 0, 0, '', 0, 0, 0, '', 'minwidth150'.($clCurrent === null ? ' error' : '')).($acc->class_source === 'default' && $clCurrent !== null ? ' <span class="opacitymedium" title="Set by default: please check">(default)</span>' : '').'</td>';
+	} else {
+		print '<td></td>';
+	}
+	$cfSuggest = financialreporting_cf_suggest($acc, $accounts, $banks, $pcgversion);
 	if ($cfSuggest === 'PL' && empty($acc->cf_class)) {
 		print '<td class="opacitymedium">in the profit</td>';
 	} else {
 		$cfOptions = array('' => 'auto: '.strtolower($cfSuggest === 'PL' ? 'profit' : $cfSuggest));
-		foreach (anychartlab_cf_classes() as $code => $label) {
+		foreach (financialreporting_cf_classes() as $code => $label) {
 			$cfOptions[$code] = $label;
 		}
 		print '<td>'.$form->selectarray('cf_class['.$acc->rowid.']', $cfOptions, (string) $acc->cf_class, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
 	}
 	print '<td class="opacitymedium">'.dol_escape_htmltag((string) $acc->source).'</td>';
 	if ($showDraft) {
-		print '<td>'.dol_escape_htmltag(anychartlab_draft_code($acc)).'</td>';
+		print '<td>'.dol_escape_htmltag(financialreporting_draft_code($acc)).'</td>';
 	}
 	print '</tr>';
 }
 if (!$shown) {
-	print '<tr><td colspan="10" class="opacitymedium">No account matches the filter.</td></tr>';
+	print '<tr><td colspan="11" class="opacitymedium">No account matches the filter.</td></tr>';
 }
 print '</table></div>';
 

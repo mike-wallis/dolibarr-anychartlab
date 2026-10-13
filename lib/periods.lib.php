@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — several periods side by side.
+ * Financial Reporting — several periods side by side.
  *
  * Each period is built exactly like the single-period report (same rows, same
  * layout, same view), then the rows of all periods are merged into one table:
@@ -14,7 +14,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 /**
  * Maximum number of period columns (beyond that the PDF is unreadable).
  */
-define('ANYCHARTLAB_MAX_PERIODS', 13);
+define('FINANCIALREPORTING_MAX_PERIODS', 13);
 
 /**
  * Timestamp of 00:00:00 on the 1st of a month; month may be outside 1..12.
@@ -23,7 +23,7 @@ define('ANYCHARTLAB_MAX_PERIODS', 13);
  * @param int $year
  * @return int
  */
-function anychartlab_month_start($month, $year)
+function financialreporting_month_start($month, $year)
 {
 	while ($month > 12) {
 		$month -= 12;
@@ -43,7 +43,7 @@ function anychartlab_month_start($month, $year)
  * @param int $fyStart
  * @return string
  */
-function anychartlab_fy_label($fyStart)
+function financialreporting_fy_label($fyStart)
 {
 	$y = (int) dol_print_date($fyStart, '%Y');
 	if (max(1, getDolGlobalInt('SOCIETE_FISCAL_MONTH_START', 1)) === 1) {
@@ -60,7 +60,7 @@ function anychartlab_fy_label($fyStart)
  * @param string $mode months, quarters or years
  * @return array<int,array{from:int,to:int,label:string,title:string}> Empty when the range is empty
  */
-function anychartlab_split_periods($from, $to, $mode)
+function financialreporting_split_periods($from, $to, $mode)
 {
 	$fm = max(1, getDolGlobalInt('SOCIETE_FISCAL_MONTH_START', 1));
 	$out = array();
@@ -70,21 +70,21 @@ function anychartlab_split_periods($from, $to, $mode)
 		$y = (int) dol_print_date($cursor, '%Y');
 		$m = (int) dol_print_date($cursor, '%m');
 		if ($mode === 'months') {
-			$start = anychartlab_month_start($m, $y);
-			$next = anychartlab_month_start($m + 1, $y);
+			$start = financialreporting_month_start($m, $y);
+			$next = financialreporting_month_start($m + 1, $y);
 			$label = dol_print_date($start, '%b %Y');
 		} else {
-			$fyStart = anychartlab_fiscal_year_start($cursor);
+			$fyStart = financialreporting_fiscal_year_start($cursor);
 			if ($mode === 'quarters') {
 				$offset = ($m - $fm + 12) % 12;	// months since the fiscal year started
 				$q = intdiv($offset, 3);
-				$start = anychartlab_month_start($m - ($offset % 3), $y);
-				$next = anychartlab_month_start($m - ($offset % 3) + 3, $y);
-				$label = 'Q'.($q + 1).' '.anychartlab_fy_label($fyStart);
+				$start = financialreporting_month_start($m - ($offset % 3), $y);
+				$next = financialreporting_month_start($m - ($offset % 3) + 3, $y);
+				$label = 'Q'.($q + 1).' '.financialreporting_fy_label($fyStart);
 			} else {
 				$start = $fyStart;
-				$next = anychartlab_month_start($fm, (int) dol_print_date($fyStart, '%Y') + 1);
-				$label = 'FY '.anychartlab_fy_label($fyStart);
+				$next = financialreporting_month_start($fm, (int) dol_print_date($fyStart, '%Y') + 1);
+				$label = 'FY '.financialreporting_fy_label($fyStart);
 			}
 		}
 		$pFrom = max($from, $start);
@@ -105,7 +105,7 @@ function anychartlab_split_periods($from, $to, $mode)
  * @param int $to
  * @return int Number of months, 0 when it is not whole months
  */
-function anychartlab_whole_months($from, $to)
+function financialreporting_whole_months($from, $to)
 {
 	if ((int) dol_print_date($from, '%d') !== 1 || dol_print_date($from, '%H%M%S') !== '000000') {
 		return 0;
@@ -125,22 +125,22 @@ function anychartlab_whole_months($from, $to)
  * @param int $to
  * @return string
  */
-function anychartlab_period_label($from, $to)
+function financialreporting_period_label($from, $to)
 {
-	$n = anychartlab_whole_months($from, $to);
+	$n = financialreporting_whole_months($from, $to);
 	if ($n === 1) {
 		return dol_print_date($from, '%b %Y');
 	}
 	$fm = max(1, getDolGlobalInt('SOCIETE_FISCAL_MONTH_START', 1));
 	$m = (int) dol_print_date($from, '%m');
 	if ($n === 3 && (($m - $fm + 12) % 3) === 0) {
-		$p = anychartlab_split_periods($from, $to, 'quarters');
+		$p = financialreporting_split_periods($from, $to, 'quarters');
 		if (count($p) === 1) {
 			return $p[0]['label'];
 		}
 	}
 	if ($n === 12 && $m === $fm) {
-		return 'FY '.anychartlab_fy_label($from);
+		return 'FY '.financialreporting_fy_label($from);
 	}
 	return dol_print_date($from, 'day').' - '.dol_print_date($to, 'day');
 }
@@ -154,14 +154,14 @@ function anychartlab_period_label($from, $to)
  *                     for whole months, else the same number of days) or lastyear
  * @return array{from:int,to:int}
  */
-function anychartlab_compare_period($from, $to, $mode)
+function financialreporting_compare_period($from, $to, $mode)
 {
 	if ($mode === 'lastyear') {
 		return array('from' => dol_time_plus_duree($from, -1, 'y'), 'to' => dol_time_plus_duree($to, -1, 'y'));
 	}
-	$n = anychartlab_whole_months($from, $to);
+	$n = financialreporting_whole_months($from, $to);
 	if ($n > 0) {
-		$start = anychartlab_month_start((int) dol_print_date($from, '%m') - $n, (int) dol_print_date($from, '%Y'));
+		$start = financialreporting_month_start((int) dol_print_date($from, '%m') - $n, (int) dol_print_date($from, '%Y'));
 		return array('from' => $start, 'to' => $from - 1);
 	}
 	$days = (int) round(($to - $from + 1) / 86400);
@@ -174,7 +174,7 @@ function anychartlab_compare_period($from, $to, $mode)
  *
  * @param DoliDB      $db
  * @param int         $entity
- * @param array       $accounts  From anychartlab_load_accounts()
+ * @param array       $accounts  From financialreporting_load_accounts()
  * @param int         $from
  * @param int         $to
  * @param object|null $layout
@@ -183,32 +183,32 @@ function anychartlab_compare_period($from, $to, $mode)
  * @param array|null  $entries   Entries by account (detailed view), null = none
  * @return array{rows:array,is:array,laid:array|null}
  */
-function anychartlab_is_rows($db, $entity, $accounts, $from, $to, $layout, $view, $hideEmpty, $entries = null)
+function financialreporting_is_rows($db, $entity, $accounts, $from, $to, $layout, $view, $hideEmpty, $entries = null)
 {
-	$is = anychartlab_is_from_balances($accounts, anychartlab_balances($db, $entity, $from, $to));
+	$is = financialreporting_is_from_balances($accounts, financialreporting_balances($db, $entity, $from, $to));
 	$rows = array();
 	$laid = null;
 	if ($layout) {
 		$alllines = array_merge($is['sections']['INCOME'], $is['sections']['EXPENSE']);
-		$laid = anychartlab_apply_layout($layout, $alllines, array('RESULT' => $is['result']));
-		$hidden = ($hideEmpty ? anychartlab_layout_hidden($laid) : array());
-		$rows = anychartlab_layout_csv($laid, $accounts, $view, $entries, $hidden);
+		$laid = financialreporting_apply_layout($layout, $alllines, array('RESULT' => $is['result']));
+		$hidden = ($hideEmpty ? financialreporting_layout_hidden($laid) : array());
+		$rows = financialreporting_layout_csv($laid, $accounts, $view, $entries, $hidden);
 		if ($laid['unmatched']) {
-			$rows[] = anychartlab_r(array('Not in layout', '', '', '', ''), 'section');
+			$rows[] = financialreporting_r(array('Not in layout', '', '', '', ''), 'section');
 			$sum = 0.0;
 			foreach ($laid['unmatched'] as $l) {
-				$rows[] = anychartlab_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, 'placed as '.$l['section'], price2num($l['amount'], 'MT')), 'account');
+				$rows[] = financialreporting_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, 'placed as '.$l['section'], price2num($l['amount'], 'MT')), 'account');
 				$sum += $l['amount'];
 			}
-			$rows[] = anychartlab_r(array('', 'Total not in layout', '', '', price2num($sum, 'MT')), 'total');
+			$rows[] = financialreporting_r(array('', 'Total not in layout', '', '', price2num($sum, 'MT')), 'total');
 		}
 	} else {
 		foreach (array('INCOME' => 'Income', 'EXPENSE' => 'Expenses') as $code => $title) {
-			$rows[] = anychartlab_r(array($title, '', '', '', ''), 'section');
-			$rows = array_merge($rows, anychartlab_groups_csv(anychartlab_group_lines($is['sections'][$code], $accounts), $view, $entries, $code));
-			$rows[] = anychartlab_r(array('', 'Total '.strtolower($title), '', '', price2num($is['totals'][$code], 'MT')), 'total');
+			$rows[] = financialreporting_r(array($title, '', '', '', ''), 'section');
+			$rows = array_merge($rows, financialreporting_groups_csv(financialreporting_group_lines($is['sections'][$code], $accounts), $view, $entries, $code));
+			$rows[] = financialreporting_r(array('', 'Total '.strtolower($title), '', '', price2num($is['totals'][$code], 'MT')), 'total');
 		}
-		$rows[] = anychartlab_r(array('', 'Net result (income - expenses)', '', '', price2num($is['result'], 'MT')), 'grandtotal');
+		$rows[] = financialreporting_r(array('', 'Net result (income - expenses)', '', '', price2num($is['result'], 'MT')), 'grandtotal');
 	}
 	return array('rows' => $rows, 'is' => $is, 'laid' => $laid);
 }
@@ -220,10 +220,10 @@ function anychartlab_is_rows($db, $entity, $accounts, $from, $to, $layout, $view
  * The first list gives the order; a row missing from it is inserted after the last
  * row it follows in its own period.
  *
- * @param array<int,array> $lists Rows per column (rows from anychartlab_is_rows())
+ * @param array<int,array> $lists Rows per column (rows from financialreporting_is_rows())
  * @return array<int,array{kind:string,cells:array,amounts:array<int,float|null>}>
  */
-function anychartlab_merge_period_rows($lists)
+function financialreporting_merge_period_rows($lists)
 {
 	$merged = array();
 	$n = count($lists);
@@ -264,7 +264,7 @@ function anychartlab_merge_period_rows($lists)
  * @param float|null $previous
  * @return array{0:float|null,1:float|null} change, change in % (null when the previous amount is zero)
  */
-function anychartlab_change($current, $previous)
+function financialreporting_change($current, $previous)
 {
 	if ($current === null && $previous === null) {
 		return array(null, null);
@@ -280,7 +280,7 @@ function anychartlab_change($current, $previous)
  *
  * @param DoliDB      $db
  * @param int         $entity
- * @param array       $accounts  From anychartlab_load_accounts()
+ * @param array       $accounts  From financialreporting_load_accounts()
  * @param int         $asof
  * @param object|null $layout
  * @param string      $view      detailed or summary
@@ -290,45 +290,63 @@ function anychartlab_change($current, $previous)
  *                               line then has the same label whatever its result
  * @return array{rows:array,bs:array,laid:array|null}
  */
-function anychartlab_bs_rows($db, $entity, $accounts, $asof, $layout, $view, $hideEmpty, $entries = null, $columns = false)
+function financialreporting_bs_rows($db, $entity, $accounts, $asof, $layout, $view, $hideEmpty, $entries = null, $columns = false, $split = false)
 {
-	$window = anychartlab_window_start($db, $entity, $asof);
-	$bs = anychartlab_bs_from_balances($accounts, anychartlab_balances($db, $entity, $window['start'], $asof), $window);
+	$window = financialreporting_window_start($db, $entity, $asof);
+	$bs = financialreporting_bs_from_balances($accounts, financialreporting_balances($db, $entity, $window['start'], $asof), $window);
 	$rows = array();
 	$laid = null;
 	if ($layout) {
 		$alllines = array_merge($bs['sections']['ASSET'], $bs['sections']['LIABILITY'], $bs['sections']['EQUITY']);
-		$laid = anychartlab_apply_layout($layout, $alllines, array('RESULT' => $bs['result']));
-		$hidden = ($hideEmpty ? anychartlab_layout_hidden($laid) : array());
-		$rows = anychartlab_layout_csv($laid, $accounts, $view, $entries, $hidden);
+		$laid = financialreporting_apply_layout($layout, $alllines, array('RESULT' => $bs['result']));
+		$hidden = ($hideEmpty ? financialreporting_layout_hidden($laid) : array());
+		$rows = financialreporting_layout_csv($laid, $accounts, $view, $entries, $hidden);
 		if ($laid['unmatched']) {
-			$rows[] = anychartlab_r(array('Not in layout', '', '', '', ''), 'section');
+			$rows[] = financialreporting_r(array('Not in layout', '', '', '', ''), 'section');
 			$sum = 0.0;
 			foreach ($laid['unmatched'] as $l) {
-				$rows[] = anychartlab_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, 'placed as '.$l['section'], price2num($l['amount'], 'MT')), 'account');
+				$rows[] = financialreporting_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, 'placed as '.$l['section'], price2num($l['amount'], 'MT')), 'account');
 				$sum += $l['amount'];
 			}
-			$rows[] = anychartlab_r(array('', 'Total not in layout', '', '', price2num($sum, 'MT')), 'total');
+			$rows[] = financialreporting_r(array('', 'Total not in layout', '', '', price2num($sum, 'MT')), 'total');
 		}
 	} else {
 		foreach (array('ASSET' => 'Assets', 'LIABILITY' => 'Liabilities', 'EQUITY' => 'Equity') as $code => $title) {
-			$rows[] = anychartlab_r(array($title, '', '', '', ''), 'section');
-			$rows = array_merge($rows, anychartlab_groups_csv(anychartlab_group_lines($bs['sections'][$code], $accounts), $view, $entries, $code));
-			if ($code === 'EQUITY') {
-				$rows[] = anychartlab_r(array('', 'Result of unclosed periods', '', '', price2num($bs['result'], 'MT')), 'account');
-				$rows[] = anychartlab_r(array('', 'Total equity', '', '', price2num($bs['totals']['EQUITY'] + $bs['result'], 'MT')), 'total');
+			$rows[] = financialreporting_r(array($title, '', '', '', ''), 'section');
+			if ($split && $code !== 'EQUITY') {
+				// one block per account class (current / non-current / cash), each with its total
+				foreach (financialreporting_bs_split($bs['sections'][$code], $code) as $class => $g) {
+					$label = financialreporting_class_label($class);
+					$rows[] = financialreporting_r(array('', $label, '', '', ''), 'heading');
+					foreach ($g['sub'] as $sub => $sg) {
+						if ($sub !== '') {	// a class the user added under this one
+							$rows[] = financialreporting_r(array('', financialreporting_class_label($sub), '', '', ''), 'parent');
+						}
+						$rows = array_merge($rows, financialreporting_groups_csv(financialreporting_group_lines($sg['lines'], $accounts), $view, $entries, $code));
+						if ($sub !== '') {
+							$rows[] = financialreporting_r(array('', 'Subtotal '.financialreporting_class_label($sub), '', '', price2num($sg['total'], 'MT')), 'subtotal');
+						}
+					}
+					$rows[] = financialreporting_r(array('', 'Total '.$label, '', '', price2num($g['total'], 'MT')), 'total');
+				}
 			} else {
-				$rows[] = anychartlab_r(array('', 'Total '.strtolower($title), '', '', price2num($bs['totals'][$code], 'MT')), 'total');
+				$rows = array_merge($rows, financialreporting_groups_csv(financialreporting_group_lines($bs['sections'][$code], $accounts), $view, $entries, $code));
+			}
+			if ($code === 'EQUITY') {
+				$rows[] = financialreporting_r(array('', 'Result of unclosed periods', '', '', price2num($bs['result'], 'MT')), 'account');
+				$rows[] = financialreporting_r(array('', 'Total equity', '', '', price2num($bs['totals']['EQUITY'] + $bs['result'], 'MT')), 'total');
+			} else {
+				$rows[] = financialreporting_r(array('', 'Total '.strtolower($title), '', '', price2num($bs['totals'][$code], 'MT')), 'total');
 			}
 		}
-		$rows[] = anychartlab_r(array('', 'Total liabilities + equity', '', '', price2num($bs['total_liab_equity'], 'MT')), 'grandtotal');
+		$rows[] = financialreporting_r(array('', 'Total liabilities + equity', '', '', price2num($bs['total_liab_equity'], 'MT')), 'grandtotal');
 	}
 	if ($columns) {
 		$check = 'Check: assets - (liabilities + equity), should be 0';
 	} else {
 		$check = (abs($bs['difference']) < 0.005 ? 'Check: assets = liabilities + equity' : 'CHECK FAILED: assets - (liabilities + equity)');
 	}
-	$rows[] = anychartlab_r(array('', $check, '', '', price2num($bs['difference'], 'MT')), 'grandtotal');
+	$rows[] = financialreporting_r(array('', $check, '', '', price2num($bs['difference'], 'MT')), 'grandtotal');
 	return array('rows' => $rows, 'bs' => $bs, 'laid' => $laid);
 }
 
@@ -341,10 +359,10 @@ function anychartlab_bs_rows($db, $entity, $accounts, $asof, $layout, $view, $hi
  * @param string $mode months, quarters or years
  * @return int[]
  */
-function anychartlab_bs_dates($from, $asof, $mode)
+function financialreporting_bs_dates($from, $asof, $mode)
 {
 	$dates = array();
-	foreach (anychartlab_split_periods($from, $asof, $mode) as $p) {
+	foreach (financialreporting_split_periods($from, $asof, $mode) as $p) {
 		$dates[] = $p['to'];
 	}
 	return $dates;
@@ -358,15 +376,15 @@ function anychartlab_bs_dates($from, $asof, $mode)
  *                     fiscal year) or lastyear (same date a year earlier)
  * @return int
  */
-function anychartlab_bs_compare_date($asof, $mode)
+function financialreporting_bs_compare_date($asof, $mode)
 {
 	if ($mode === 'lastyear') {
 		return dol_time_plus_duree($asof, -1, 'y');
 	}
 	if ($mode === 'prevfy') {
-		return anychartlab_fiscal_year_start($asof) - 1;
+		return financialreporting_fiscal_year_start($asof) - 1;
 	}
-	return anychartlab_month_start((int) dol_print_date($asof, '%m'), (int) dol_print_date($asof, '%Y')) - 1;
+	return financialreporting_month_start((int) dol_print_date($asof, '%m'), (int) dol_print_date($asof, '%Y')) - 1;
 }
 
 /**
@@ -377,10 +395,10 @@ function anychartlab_bs_compare_date($asof, $mode)
  * @param array $def Column: label, title, src (index of the amounts, or 'chg' / 'pct')
  * @return float|null
  */
-function anychartlab_matrix_cell($m, $def)
+function financialreporting_matrix_cell($m, $def)
 {
 	if ($def['src'] === 'chg' || $def['src'] === 'pct') {
-		$c = anychartlab_change($m['amounts'][0], $m['amounts'][1]);
+		$c = financialreporting_change($m['amounts'][0], $m['amounts'][1]);
 		return ($def['src'] === 'chg' ? $c[0] : $c[1]);
 	}
 	return $m['amounts'][$def['src']];
@@ -393,23 +411,23 @@ function anychartlab_matrix_cell($m, $def)
  * @param array      $def
  * @return string
  */
-function anychartlab_matrix_text($v, $def)
+function financialreporting_matrix_text($v, $def)
 {
 	if ($v === null) {
 		return '';
 	}
-	return ($def['src'] === 'pct' ? number_format($v, 1).'%' : anychartlab_price($v));
+	return ($def['src'] === 'pct' ? number_format($v, 1).'%' : financialreporting_price($v));
 }
 
 /**
  * Print a table with several amount columns.
  *
- * @param array $merged   From anychartlab_merge_period_rows()
- * @param array $colDefs  Column definitions (see anychartlab_matrix_cell())
- * @param array $accounts From anychartlab_load_accounts() (links to the ledger)
+ * @param array $merged   From financialreporting_merge_period_rows()
+ * @param array $colDefs  Column definitions (see financialreporting_matrix_cell())
+ * @param array $accounts From financialreporting_load_accounts() (links to the ledger)
  * @return void
  */
-function anychartlab_matrix_print($merged, $colDefs, $accounts)
+function financialreporting_matrix_print($merged, $colDefs, $accounts)
 {
 	print '<div class="div-table-responsive"><table class="noborder centpercent">';
 	print '<tr class="liste_titre"><th>Account</th><th>Label</th>';
@@ -421,16 +439,16 @@ function anychartlab_matrix_print($merged, $colDefs, $accounts)
 		$kind = $m['kind'];
 		$trClass = ($kind === 'section' ? 'liste_titre' : (in_array($kind, array('total', 'grandtotal')) ? 'liste_total' : 'oddeven'));
 		$acc = (string) $m['cells'][0];
-		print '<tr class="'.$trClass.' acl-'.$kind.'">';
+		print '<tr class="'.$trClass.' fr-'.$kind.'">';
 		if ($kind === 'section') {
 			print '<td colspan="2">'.dol_escape_htmltag($acc.($m['cells'][1] !== '' ? ' '.$m['cells'][1] : '')).'</td>';
 		} else {
 			$link = ($acc !== '' && in_array($kind, array('account', 'child')) && isset($accounts['byNumber'][$acc]));
-			print '<td class="nowraponall">'.($link ? '<a href="'.anychartlab_ledger_url($acc).'" target="_blank">'.dol_escape_htmltag($acc).'</a>' : dol_escape_htmltag($acc)).'</td>';
+			print '<td class="nowraponall">'.($link ? '<a href="'.financialreporting_ledger_url($acc).'" target="_blank">'.dol_escape_htmltag($acc).'</a>' : dol_escape_htmltag($acc)).'</td>';
 			print '<td>'.dol_escape_htmltag($m['cells'][1]).'</td>';
 		}
 		foreach ($colDefs as $def) {
-			print '<td class="right amount nowraponall">'.anychartlab_matrix_text(anychartlab_matrix_cell($m, $def), $def).'</td>';
+			print '<td class="right amount nowraponall">'.financialreporting_matrix_text(financialreporting_matrix_cell($m, $def), $def).'</td>';
 		}
 		print '</tr>';
 	}
@@ -448,22 +466,22 @@ function anychartlab_matrix_print($merged, $colDefs, $accounts)
  * @param array  $colDefs
  * @return void
  */
-function anychartlab_matrix_send($action, $name, $title, $subtitle, $merged, $colDefs)
+function financialreporting_matrix_send($action, $name, $title, $subtitle, $merged, $colDefs)
 {
 	if ($action === 'export') {
 		$csv = array();
 		foreach ($merged as $m) {
 			$line = array($m['cells'][0], $m['cells'][1]);
 			foreach ($colDefs as $def) {
-				$v = anychartlab_matrix_cell($m, $def);
+				$v = financialreporting_matrix_cell($m, $def);
 				$line[] = ($v === null ? '' : ($def['src'] === 'pct' ? round($v, 1) : price2num($v, 'MT')));
 			}
 			$csv[] = $line;
 		}
-		anychartlab_send_csv('anychartlab-'.$name, array_merge(array('account', 'label'), array_column($colDefs, 'label')), $csv);
+		financialreporting_send_csv('financialreporting-'.$name, array_merge(array('account', 'label'), array_column($colDefs, 'label')), $csv);
 	}
 	$n = count($colDefs);
-	$showAcc = ($n <= 6 && anychartlab_cfg('PDF_SHOW_ACCOUNT_COL') !== '0');
+	$showAcc = ($n <= 6 && financialreporting_cfg('PDF_SHOW_ACCOUNT_COL') !== '0');
 	$amountW = min(0.14, ($n > 10 ? 0.74 : 0.66) / $n);
 	$columns = array(array('title' => 'Account', 'width' => ($showAcc ? 0.09 : 0), 'align' => 'L', 'indent' => 1));
 	$columns[] = array('title' => 'Label', 'width' => 1 - ($showAcc ? 0.09 : 0) - $n * $amountW, 'align' => 'L', 'indent' => 1);
@@ -477,9 +495,9 @@ function anychartlab_matrix_send($action, $name, $title, $subtitle, $merged, $co
 			$cells[1] = trim(($cells[0] !== '' ? $cells[0].' ' : '').$cells[1]);
 		}
 		foreach ($colDefs as $def) {
-			$cells[] = anychartlab_matrix_text(anychartlab_matrix_cell($m, $def), $def);
+			$cells[] = financialreporting_matrix_text(financialreporting_matrix_cell($m, $def), $def);
 		}
 		$pdfRows[] = array('kind' => $m['kind'], 'cells' => $cells);
 	}
-	anychartlab_pdf_table($name, $title, $subtitle, $columns, $pdfRows, $action === 'pdfpreview', ($n > 3 ? 'L' : ''), ($n > 10 ? 6.5 : ($n > 8 ? 7 : ($n > 5 ? 8 : 0))));
+	financialreporting_pdf_table($name, $title, $subtitle, $columns, $pdfRows, $action === 'pdfpreview', ($n > 3 ? 'L' : ''), ($n > 10 ? 6.5 : ($n > 8 ? 7 : ($n > 5 ? 8 : 0))));
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — Cash Flow statement (indirect method).
+ * Financial Reporting — Cash Flow statement (indirect method).
  *
  * Cash = the accounting accounts of Dolibarr's bank and cash accounts (Banks / Cash),
  * plus any account whose cash flow class is set to "cash". The cash movement of the
@@ -20,7 +20,7 @@
  *
  * @return array<string,string>
  */
-function anychartlab_cf_classes()
+function financialreporting_cf_classes()
 {
 	return array('CASH' => 'Cash', 'OPERATING' => 'Operating', 'INVESTING' => 'Investing', 'FINANCING' => 'Financing');
 }
@@ -32,7 +32,7 @@ function anychartlab_cf_classes()
  * @param int    $entity
  * @return array<string,string> account number => bank account label
  */
-function anychartlab_cf_bank_accounts($db, $entity)
+function financialreporting_cf_bank_accounts($db, $entity)
 {
 	$out = array();
 	$sql = "SELECT account_number, label FROM ".MAIN_DB_PREFIX."bank_account WHERE entity = ".((int) $entity)." AND account_number IS NOT NULL AND account_number <> ''";
@@ -45,36 +45,53 @@ function anychartlab_cf_bank_accounts($db, $entity)
 
 /**
  * Cash flow class of an account: the one set on the Account natures page, else a
- * suggestion from Dolibarr's bank accounts, the account's nature, the chart (French
- * PCG classes) and words in its label or its parents' labels.
+ * suggestion from Dolibarr's bank accounts, the account's class (cash, non-current,
+ * equity), its nature, the chart (French PCG classes) and words in its label or its
+ * parents' labels.
  *
  * @param object $acc
- * @param array  $accounts From anychartlab_load_accounts()
- * @param array  $banks    From anychartlab_cf_bank_accounts()
+ * @param array  $accounts From financialreporting_load_accounts()
+ * @param array  $banks    From financialreporting_cf_bank_accounts()
  * @param string $pcgversion
  * @return array{0:string,1:string} class (CASH, OPERATING, INVESTING, FINANCING or PL for income/expense), 'set' or 'auto'
  */
-function anychartlab_cf_class($acc, $accounts, $banks, $pcgversion)
+function financialreporting_cf_class($acc, $accounts, $banks, $pcgversion)
 {
-	if (!empty($acc->cf_class) && isset(anychartlab_cf_classes()[$acc->cf_class])) {
+	if (!empty($acc->cf_class) && isset(financialreporting_cf_classes()[$acc->cf_class])) {
 		return array($acc->cf_class, 'set');
 	}
-	return array(anychartlab_cf_suggest($acc, $accounts, $banks, $pcgversion), 'auto');
+	return array(financialreporting_cf_suggest($acc, $accounts, $banks, $pcgversion), 'auto');
 }
 
 /**
- * Suggested cash flow class (see anychartlab_cf_class()).
+ * Suggested cash flow class (see financialreporting_cf_class()).
  *
  * @return string
  */
-function anychartlab_cf_suggest($acc, $accounts, $banks, $pcgversion)
+function financialreporting_cf_suggest($acc, $accounts, $banks, $pcgversion)
 {
 	$number = (string) $acc->account_number;
 	if (isset($banks[$number])) {
 		return 'CASH';
 	}
-	if (anychartlab_is_pl((string) $acc->nature)) {
+	if (financialreporting_is_pl((string) $acc->nature)) {
 		return 'PL';
+	}
+	// The account class, when it decides (works with any chart): cash, fixed assets, borrowings, equity
+	$base = financialreporting_base_class(financialreporting_account_class($acc));
+	if ($base === 'CASH') {
+		return 'CASH';
+	}
+	if ($base === 'NONCURRENT_ASSET') {
+		// accumulated depreciation is non-cash: its movement adds back the expense
+		return ($acc->contra || preg_match('/deprecia|amortis|amortiz|impairment|d[ée]pr[ée]ciation/i', (string) $acc->label)) ? 'OPERATING' : 'INVESTING';
+	}
+	if ($base === 'NONCURRENT_LIABILITY') {
+		// long-term provisions (leave, deferred tax) are operating; borrowings are financing
+		return preg_match('/provision|leave|\blsl\b|long service|deferred tax|impôt différé/i', (string) $acc->label) ? 'OPERATING' : 'FINANCING';
+	}
+	if ($base === 'EQUITY') {
+		return 'FINANCING';
 	}
 	// French PCG: by class of account
 	if (stripos($pcgversion, 'PCG') === 0) {
@@ -134,7 +151,7 @@ function anychartlab_cf_suggest($acc, $accounts, $banks, $pcgversion)
  * @param int      $to
  * @return array{opening:array<string,float>,moves:array<string,float>,openingEntries:int}
  */
-function anychartlab_cf_movements($db, $entity, $from, $to)
+function financialreporting_cf_movements($db, $entity, $from, $to)
 {
 	$out = array('opening' => array(), 'moves' => array(), 'openingEntries' => 0);
 	$sql = "SELECT b.numero_compte, SUM(b.debit) as debit, SUM(b.credit) as credit, COUNT(*) as n,";
@@ -168,21 +185,21 @@ function anychartlab_cf_movements($db, $entity, $from, $to)
  *
  * @param DoliDB $db
  * @param int    $entity
- * @param array  $accounts From anychartlab_load_accounts()
+ * @param array  $accounts From financialreporting_load_accounts()
  * @param string $pcgversion
  * @param int    $from
  * @param int    $to
  * @return array
  */
-function anychartlab_cf_build($db, $entity, $accounts, $pcgversion, $from, $to)
+function financialreporting_cf_build($db, $entity, $accounts, $pcgversion, $from, $to)
 {
-	$window = anychartlab_window_start($db, $entity, $to);
+	$window = financialreporting_window_start($db, $entity, $to);
 	$start = $window['start'];
 	$cut = ($start !== null && $start > $from);
 	$moveFrom = ($cut ? $start : $from);
-	$before = ($cut ? array() : anychartlab_balances($db, $entity, $start, $moveFrom - 1));
-	$m = anychartlab_cf_movements($db, $entity, $moveFrom, $to);
-	$banks = anychartlab_cf_bank_accounts($db, $entity);
+	$before = ($cut ? array() : financialreporting_balances($db, $entity, $start, $moveFrom - 1));
+	$m = financialreporting_cf_movements($db, $entity, $moveFrom, $to);
+	$banks = financialreporting_cf_bank_accounts($db, $entity);
 
 	$cf = array(
 		'window' => $window, 'cut' => $cut, 'moveFrom' => $moveFrom, 'openingEntries' => $m['openingEntries'],
@@ -198,7 +215,7 @@ function anychartlab_cf_build($db, $entity, $accounts, $pcgversion, $from, $to)
 		$opening = ($before[$number] ?? 0.0) + ($m['opening'][$number] ?? 0.0);
 		$move = ($m['moves'][$number] ?? 0.0);
 		$acc = $accounts['byNumber'][$number] ?? null;
-		$class = ($acc ? anychartlab_cf_class($acc, $accounts, $banks, $pcgversion) : array('OTHER', 'auto'));
+		$class = ($acc ? financialreporting_cf_class($acc, $accounts, $banks, $pcgversion) : array('OTHER', 'auto'));
 		if ($class[0] === 'CASH') {
 			$cf['cash'][] = array('number' => $number, 'label' => ($acc ? $acc->label : ($banks[$number] ?? '')), 'opening' => $opening, 'closing' => $opening + $move, 'source' => $class[1]);
 			$cf['openingCash'] += $opening;
@@ -209,7 +226,7 @@ function anychartlab_cf_build($db, $entity, $accounts, $pcgversion, $from, $to)
 		if (abs($move) < 0.005) {
 			continue;
 		}
-		if ($acc && anychartlab_is_pl((string) $acc->nature)) {
+		if ($acc && financialreporting_is_pl((string) $acc->nature)) {
 			$cf['profit'] += -$move;
 			$cf['plAccounts']++;
 			continue;
@@ -256,12 +273,12 @@ function anychartlab_cf_build($db, $entity, $accounts, $pcgversion, $from, $to)
 /**
  * Report rows (cells: account, label, nature, note, amount), for screen, CSV and PDF.
  *
- * @param array  $cf       From anychartlab_cf_build()
- * @param array  $accounts From anychartlab_load_accounts()
+ * @param array  $cf       From financialreporting_cf_build()
+ * @param array  $accounts From financialreporting_load_accounts()
  * @param string $view     detailed or summary
  * @return array
  */
-function anychartlab_cf_rows($cf, $accounts, $view)
+function financialreporting_cf_rows($cf, $accounts, $view)
 {
 	$titles = array('OPERATING' => 'Cash flows from operating activities', 'INVESTING' => 'Cash flows from investing activities', 'FINANCING' => 'Cash flows from financing activities', 'OTHER' => 'Accounts not in a class (unclassified, excluded or not in the chart)');
 	$rows = array();
@@ -269,19 +286,19 @@ function anychartlab_cf_rows($cf, $accounts, $view)
 		if ($code === 'OTHER' && !$cf['sections']['OTHER']) {
 			continue;
 		}
-		$rows[] = anychartlab_r(array($title, '', '', '', ''), 'section');
+		$rows[] = financialreporting_r(array($title, '', '', '', ''), 'section');
 		if ($code === 'OPERATING') {
-			$rows[] = anychartlab_r(array('', 'Profit for the period', '', $cf['plAccounts'].' P&L accounts', price2num($cf['profit'], 'MT')), 'account');
+			$rows[] = financialreporting_r(array('', 'Profit for the period', '', $cf['plAccounts'].' P&L accounts', price2num($cf['profit'], 'MT')), 'account');
 			if ($cf['sections']['OPERATING']) {
-				$rows[] = anychartlab_r(array('', 'Adjustments (non-cash items, working capital)', '', '', ''), 'heading');
+				$rows[] = financialreporting_r(array('', 'Adjustments (non-cash items, working capital)', '', '', ''), 'heading');
 			}
 		}
-		$rows = array_merge($rows, anychartlab_groups_csv(anychartlab_group_lines($cf['sections'][$code], $accounts), $view, null, ''));
-		$rows[] = anychartlab_r(array('', 'Net cash from '.strtolower(str_replace('Cash flows from ', '', $title)), '', '', price2num($cf['totals'][$code], 'MT')), 'total');
+		$rows = array_merge($rows, financialreporting_groups_csv(financialreporting_group_lines($cf['sections'][$code], $accounts), $view, null, ''));
+		$rows[] = financialreporting_r(array('', 'Net cash from '.strtolower(str_replace('Cash flows from ', '', $title)), '', '', price2num($cf['totals'][$code], 'MT')), 'total');
 	}
-	$rows[] = anychartlab_r(array('', 'Net increase (decrease) in cash', '', '', price2num($cf['netFlow'], 'MT')), 'grandtotal');
-	$rows[] = anychartlab_r(array('', 'Cash at the beginning of the period', '', '', price2num($cf['openingCash'], 'MT')), 'account');
-	$rows[] = anychartlab_r(array('', 'Cash at the end of the period', '', '', price2num($cf['openingCash'] + $cf['netFlow'], 'MT')), 'grandtotal');
-	$rows[] = anychartlab_r(array('', (abs($cf['difference']) < 0.005 ? 'Check: = cash accounts at the end' : 'CHECK FAILED: difference with cash accounts'), '', '', price2num($cf['difference'], 'MT')), 'grandtotal');
+	$rows[] = financialreporting_r(array('', 'Net increase (decrease) in cash', '', '', price2num($cf['netFlow'], 'MT')), 'grandtotal');
+	$rows[] = financialreporting_r(array('', 'Cash at the beginning of the period', '', '', price2num($cf['openingCash'], 'MT')), 'account');
+	$rows[] = financialreporting_r(array('', 'Cash at the end of the period', '', '', price2num($cf['openingCash'] + $cf['netFlow'], 'MT')), 'grandtotal');
+	$rows[] = financialreporting_r(array('', (abs($cf['difference']) < 0.005 ? 'Check: = cash accounts at the end' : 'CHECK FAILED: difference with cash accounts'), '', '', price2num($cf['difference'], 'MT')), 'grandtotal');
 	return $rows;
 }

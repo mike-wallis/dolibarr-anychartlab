@@ -1,4 +1,4 @@
-# Any-Chart Reports Lab: France, Plan comptable general (PCG) and charts using its numbering
+# Financial Reporting: France, Plan comptable general (PCG) and charts using its numbering
 # (PCG25-DEV, PCG18-ASSOC, PCGAFR14-DEV, PCG99-BASE-NC, PCG99-ABREGE-NC). By account number,
 # most specific first; first match wins. To be checked by French users (see #31760).
 # Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment

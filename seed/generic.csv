@@ -1,4 +1,4 @@
-# Any-Chart Reports Lab: GENERIC rules, applied to every chart (including custom charts)
+# Financial Reporting: GENERIC rules, applied to every chart (including custom charts)
 # after the chart's own rules, only to accounts still unclassified.
 # Only pcg_type values that mean the same thing in every shipped chart are listed.
 # Deliberately NOT listed: CAPITAL (equity in US/CA, equity + long-term debt in AD/ES-CAT),

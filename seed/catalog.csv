@@ -1,4 +1,4 @@
-# Any-Chart Reports Lab: what the module ships, and which country / charts each file suits.
+# Financial Reporting: what the module ships, and which country / charts each file suits.
 # Used to suggest a rule set and layouts from the company country (Setup > Company) and the active chart.
 # kind: nature (rule file in seed/) or layout (file in seed/layouts/). charts: chart codes separated by |
 # country: only for countries with a national standard numbering (e.g. France's PCG), so a file is never
@@ -12,3 +12,18 @@ layout;AU-BASE-balance-sheet.csv;;AU-BASE;Balance Sheet (Australia, AU-BASE)
 layout;AU-BASE-income-statement.csv;;AU-BASE;Income Statement (Australia, AU-BASE)
 layout;FR-PCG-bilan.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;Bilan (France, PCG)
 layout;FR-PCG-compte-de-resultat.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;Compte de resultat (France, PCG)
+# kind template: report wizard templates (seed/templates/). Unlike rule files, templates ARE suggested by
+# country even for custom charts: a template gives the country's structure, and the wizard checks every
+# prefix against the actual chart.
+template;GENERIC-income-statement.csv;;;Income Statement (generic: income less expenses)
+template;AU-BASE-income-statement.csv;AU;AU-BASE;Income Statement (Australia, multi-step with gross profit)
+template;FR-PCG-compte-de-resultat.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;Compte de résultat (France, PCG, par nature)
+# kind class: account class rules (seed/classes/). seed/classes/generic.csv is always applied after them.
+# Like nature rules, only suggested for a chart, or a country with a national standard numbering.
+class;FR-PCG.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;PCG25-DEV|PCG18-ASSOC|PCGAFR14-DEV|PCG99-BASE-NC|PCG99-ABREGE-NC;France - Plan comptable général (PCG)
+# kind framework: what each country's rules require for the account classes (seed/classes/frameworks/),
+# shown in Getting started > Class structure. Countries with no entry get IFRS.csv.
+framework;FR.csv;FR|NC|PF|RE|GP|MQ|GF|YT|PM|WF;;France (PCG)
+framework;OHADA.csv;BJ|BF|CM|CF|KM|CG|CD|CI|GA|GN|GW|GQ|ML|NE|SN|TD|TG;;SYSCOHADA révisé (OHADA)
+framework;EU.csv;AT|BE|BG|HR|CY|CZ|DK|EE|FI|DE|GR|HU|IE|IT|LV|LT|LU|MT|NL|PL|PT|RO|SK|SI|ES|SE;;EU accounting directive
+framework;AU.csv;AU;;Australia (AASB)

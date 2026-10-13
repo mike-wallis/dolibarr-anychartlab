@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — Accounts Receivable / Accounts Payable from the ledger.
+ * Financial Reporting — Accounts Receivable / Accounts Payable from the ledger.
  *
  * aged.php?type=ar  customers (control account ACCOUNTING_ACCOUNT_CUSTOMER)
  * aged.php?type=ap  suppliers (control account ACCOUNTING_ACCOUNT_SUPPLIER)
@@ -24,10 +24,14 @@ if (!$res && is_file('../../main.inc.php')) {
 if (!$res) {
 	die('Include of main fails');
 }
-require_once __DIR__.'/lib/anychartlab.lib.php';
+require_once __DIR__.'/lib/financialreporting.lib.php';
+require_once __DIR__.'/lib/setup.lib.php';
 require_once __DIR__.'/lib/aged.lib.php';
 
-if (!$user->hasRight('anychartlab', 'lire')) {
+if (!isModEnabled('financialreporting')) {
+	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
+}
+if (!$user->hasRight('financialreporting', 'lire')) {
 	accessforbidden();
 }
 
@@ -38,29 +42,29 @@ $basis = (GETPOST('basis', 'aZ09') === 'doc' ? 'doc' : 'due');
 $view = (GETPOST('view', 'aZ09') === 'detailed' ? 'detailed' : 'summary');
 $asof = GETPOSTINT('asofyear') ? dol_mktime(23, 59, 59, GETPOSTINT('asofmonth'), GETPOSTINT('asofday'), GETPOSTINT('asofyear')) : dol_mktime(23, 59, 59, (int) dol_print_date(dol_now(), '%m'), (int) dol_print_date(dol_now(), '%d'), (int) dol_print_date(dol_now(), '%Y'));
 $accountsParam = trim(GETPOST('accounts', 'alphanohtml'));
-$accounts = ($accountsParam !== '' ? array_values(array_filter(array_map('trim', preg_split('/[,; ]+/', $accountsParam)))) : anychartlab_aged_default_accounts($type));
+$accounts = ($accountsParam !== '' ? array_values(array_filter(array_map('trim', preg_split('/[,; ]+/', $accountsParam)))) : financialreporting_aged_default_accounts($type));
 $cashMode = (getDolGlobalString('ACCOUNTING_MODE') === 'RECETTES-DEPENSES');
 $source = GETPOST('source', 'aZ09');
 $source = (in_array($source, array('ledger', 'invoices')) ? $source : ($cashMode ? 'invoices' : 'ledger'));
 
 $entity = (int) $conf->entity;
-$pcgversion = anychartlab_active_chart($db);
+$pcgversion = financialreporting_active_chart($db);
 $title = ($type === 'ap' ? 'Accounts Payable' : 'Accounts Receivable');
 $partyWord = ($type === 'ap' ? 'Supplier' : 'Customer');
-$buckets = anychartlab_aged_buckets($basis);
-$shortBuckets = anychartlab_aged_buckets_short($basis);
-if (anychartlab_cfg('AGED_ORDER') !== 'newest') {
+$buckets = financialreporting_aged_buckets($basis);
+$shortBuckets = financialreporting_aged_buckets_short($basis);
+if (financialreporting_cfg('AGED_ORDER') !== 'newest') {
 	// oldest first: 90+ ... Not due (Display setting)
 	$buckets = array_reverse($buckets, true);
 	$shortBuckets = array_reverse($shortBuckets, true);
 }
 
 if ($source === 'invoices') {
-	$aged = anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis);
+	$aged = financialreporting_aged_build_invoices($db, $entity, $type, $asof, $basis);
 	$ledgerBalance = null;
 } else {
-	$aged = anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis);
-	$ledgerBalance = anychartlab_aged_ledger_balance($db, $entity, $type, $accounts, $asof);
+	$aged = financialreporting_aged_build($db, $entity, $type, $accounts, $asof, $basis);
+	$ledgerBalance = financialreporting_aged_ledger_balance($db, $entity, $type, $accounts, $asof);
 }
 $isToday = (dol_print_date($asof, '%Y-%m-%d') === dol_print_date(dol_now(), '%Y-%m-%d'));
 
@@ -114,7 +118,7 @@ if (in_array($action, array('export', 'pdf', 'pdfpreview'))) {
 			}
 			$csv[] = $c;
 		}
-		anychartlab_send_csv('anychartlab-'.$name, $header, $csv);
+		financialreporting_send_csv('financialreporting-'.$name, $header, $csv);
 	}
 	$columns = array(array('title' => $header[0], 'width' => ($amt === 3 ? 0.31 : 0.46), 'align' => 'L', 'indent' => 1));
 	if ($amt === 3) {
@@ -129,11 +133,11 @@ if (in_array($action, array('export', 'pdf', 'pdfpreview'))) {
 	foreach ($rows as $r) {
 		$c = $r['cells'];
 		for ($i = $amt; $i < count($c); $i++) {
-			$c[$i] = ($c[$i] === '' || ($r['kind'] !== 'child' && abs((float) $c[$i]) < 0.005 && $i < count($c) - 1) ? '' : anychartlab_price($c[$i]));
+			$c[$i] = ($c[$i] === '' || ($r['kind'] !== 'child' && abs((float) $c[$i]) < 0.005 && $i < count($c) - 1) ? '' : financialreporting_price($c[$i]));
 		}
 		$pdfRows[] = array('kind' => $r['kind'], 'cells' => $c);
 	}
-	anychartlab_pdf_table($name, $title, $subtitle, $columns, $pdfRows, $action === 'pdfpreview', 'L');	// up to 9 columns: always landscape
+	financialreporting_pdf_table($name, $title, $subtitle, $columns, $pdfRows, $action === 'pdfpreview', 'L');	// up to 9 columns: always landscape
 }
 
 /*
@@ -141,19 +145,20 @@ if (in_array($action, array('export', 'pdf', 'pdfpreview'))) {
  */
 
 $form = new Form($db);
-llxHeader('', $title.' (Any-Chart Lab)', '', '', 0, 0, '', '', '', 'mod-anychartlab page-aged');
+llxHeader('', $title.' (Financial Reporting)', '', '', 0, 0, '', '', '', 'mod-financialreporting page-aged');
 print load_fiche_titre($title, '', 'accountancy');
-anychartlab_print_style_css();
-anychartlab_print_nav('aged.php?type='.$type, $pcgversion);
+financialreporting_print_style_css();
+financialreporting_print_nav('aged.php?type='.$type, $pcgversion);
+financialreporting_setup_gate($db, (int) $conf->entity, false);
 
 print '<form method="GET" action="'.$_SERVER['PHP_SELF'].'" name="agedform">';
 print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="filtered" value="1"><input type="hidden" name="type" value="'.$type.'">';
 print 'As of '.$form->selectDate($asof, 'asof', 0, 0, 0, 'agedform').' ';
 print 'Aged by <select name="basis" class="flat"><option value="due"'.($basis === 'due' ? ' selected' : '').'>due date</option><option value="doc"'.($basis === 'doc' ? ' selected' : '').'>document date</option></select> ';
 print 'View <select name="view" class="flat"><option value="summary"'.($view === 'summary' ? ' selected' : '').'>Summary (one line per '.strtolower($partyWord).')</option><option value="detailed"'.($view === 'detailed' ? ' selected' : '').'>Detailed (open items)</option></select> ';
-print 'Source <select name="source" class="flat" id="acl_source"><option value="ledger"'.($source === 'ledger' ? ' selected' : '').'>Accounting ledger</option><option value="invoices"'.($source === 'invoices' ? ' selected' : '').'>Unpaid invoices</option></select> ';
-print '<span id="acl_accounts"'.($source === 'invoices' ? ' style="display:none"' : '').'>Account(s) <input type="text" name="accounts" class="flat width100" value="'.dol_escape_htmltag(implode(',', $accounts)).'" title="Control account(s); default from Accounting setup"> </span>';
-print '<script>jQuery(function(){jQuery("#acl_source").on("change",function(){jQuery("#acl_accounts").toggle(jQuery(this).val()==="ledger");});});</script>';
+print 'Source <select name="source" class="flat" id="fr_source"><option value="ledger"'.($source === 'ledger' ? ' selected' : '').'>Accounting ledger</option><option value="invoices"'.($source === 'invoices' ? ' selected' : '').'>Unpaid invoices</option></select> ';
+print '<span id="fr_accounts"'.($source === 'invoices' ? ' style="display:none"' : '').'>Account(s) <input type="text" name="accounts" class="flat width100" value="'.dol_escape_htmltag(implode(',', $accounts)).'" title="Control account(s); default from Accounting setup"> </span>';
+print '<script>jQuery(function(){jQuery("#fr_source").on("change",function(){jQuery("#fr_accounts").toggle(jQuery(this).val()==="ledger");});});</script>';
 print '<input type="submit" class="button small" value="Refresh"> ';
 print '<button type="submit" class="button small" name="action" value="export">Export CSV</button> ';
 print '<button type="submit" class="button small" name="action" value="pdf">PDF</button> ';
@@ -175,11 +180,11 @@ if ($source === 'invoices') {
 if ($source === 'ledger') {
 	// Check 1: total = control account balance
 	$diff = $aged['total'] - $ledgerBalance;
-	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check 1:</b> report total '.anychartlab_price($aged['total']).' = balance of account(s) '.dol_escape_htmltag(implode(', ', $accounts)).' in the ledger '.anychartlab_price($ledgerBalance).(abs($diff) < 0.005 ? ' (as on the Balance Sheet).' : '. Difference '.anychartlab_price($diff).'.').'</div>';
+	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check 1:</b> report total '.financialreporting_price($aged['total']).' = balance of account(s) '.dol_escape_htmltag(implode(', ', $accounts)).' in the ledger '.financialreporting_price($ledgerBalance).(abs($diff) < 0.005 ? ' (as on the Balance Sheet).' : '. Difference '.financialreporting_price($diff).'.').'</div>';
 } elseif ($isToday) {
 	// Check: open invoices = Dolibarr's "remaining to pay" (today's position)
 	$byName = array();
-	foreach (anychartlab_aged_unpaid_invoices($db, $entity, $type) as $u) {
+	foreach (financialreporting_aged_unpaid_invoices($db, $entity, $type) as $u) {
 		$byName[$u['name']] = $u['remain'];	// keyed twice (code and accounting code): once per third party
 	}
 	$dolTotal = array_sum($byName);
@@ -192,10 +197,10 @@ if ($source === 'ledger') {
 		}
 	}
 	$diff = ($aged['total'] - $credits) - $dolTotal;
-	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check:</b> open invoices '.anychartlab_price($aged['total'] - $credits).' = Dolibarr\'s remaining to pay on unpaid invoices '.anychartlab_price($dolTotal).(abs($diff) < 0.005 ? '.' : '. Difference '.anychartlab_price($diff).'.').($credits ? ' Plus available credits '.anychartlab_price($credits).' = report total '.anychartlab_price($aged['total']).'.' : '').'</div>';
+	print '<div class="'.(abs($diff) < 0.005 ? 'ok' : 'error').'"><b>Check:</b> open invoices '.financialreporting_price($aged['total'] - $credits).' = Dolibarr\'s remaining to pay on unpaid invoices '.financialreporting_price($dolTotal).(abs($diff) < 0.005 ? '.' : '. Difference '.financialreporting_price($diff).'.').($credits ? ' Plus available credits '.financialreporting_price($credits).' = report total '.financialreporting_price($aged['total']).'.' : '').'</div>';
 }
 if (abs($aged['nothirdparty']) >= 0.005) {
-	print '<div class="warning">'.anychartlab_price($aged['nothirdparty']).' is on the control account without a '.strtolower($partyWord).' (no subledger account on the entry). It is in the total but cannot be aged per '.strtolower($partyWord).'.</div>';
+	print '<div class="warning">'.financialreporting_price($aged['nothirdparty']).' is on the control account without a '.strtolower($partyWord).' (no subledger account on the entry). It is in the total but cannot be aged per '.strtolower($partyWord).'.</div>';
 }
 
 // Main table
@@ -207,13 +212,13 @@ foreach ($buckets as $b) {
 print '<th class="right">Total</th></tr>';
 foreach ($rows as $r) {
 	$c = $r['cells'];
-	print '<tr class="'.($r['kind'] === 'grandtotal' ? 'liste_total' : 'oddeven').' acl-'.$r['kind'].'">';
+	print '<tr class="'.($r['kind'] === 'grandtotal' ? 'liste_total' : 'oddeven').' fr-'.$r['kind'].'">';
 	print '<td>'.(!empty($r['url']) ? '<a href="'.$r['url'].'">'.dol_escape_htmltag($c[0]).'</a>' : dol_escape_htmltag($c[0])).'</td>';
 	for ($i = 1; $i < $amt; $i++) {
 		print '<td class="nowraponall">'.dol_escape_htmltag($c[$i]).'</td>';
 	}
 	for ($i = $amt; $i < count($c); $i++) {
-		$show = ($c[$i] === '' || ($r['kind'] !== 'child' && abs((float) $c[$i]) < 0.005 && $i < count($c) - 1)) ? '' : anychartlab_price($c[$i]);
+		$show = ($c[$i] === '' || ($r['kind'] !== 'child' && abs((float) $c[$i]) < 0.005 && $i < count($c) - 1)) ? '' : financialreporting_price($c[$i]);
 		print '<td class="right amount nowraponall">'.$show.'</td>';
 	}
 	print '</tr>';
@@ -231,7 +236,7 @@ if ($source === 'invoices') {
 	print '<p class="opacitymedium">Only available as of today: Dolibarr\'s "remaining to pay" on invoices is today\'s position.</p>';
 } else {
 	print '<h3>Check 2: ledger vs Dolibarr unpaid invoices</h3>';
-	$unpaid = anychartlab_aged_unpaid_invoices($db, $entity, $type);
+	$unpaid = financialreporting_aged_unpaid_invoices($db, $entity, $type);
 	$cmp = array();
 	$seen = array();
 	foreach ($aged['parties'] as $p) {
@@ -258,7 +263,7 @@ if ($source === 'invoices') {
 		print '<table class="noborder centpercent"><tr class="liste_titre"><th>'.$partyWord.'</th><th class="right">Ledger (this report)</th><th class="right">Unpaid invoices in Dolibarr</th><th class="right">Difference</th></tr>';
 		foreach ($mismatch as $m) {
 			print '<tr class="oddeven"><td>'.dol_escape_htmltag($m['name']).' <span class="opacitymedium">('.dol_escape_htmltag($m['code']).', '.$m['count'].' unpaid invoice'.($m['count'] === 1 ? '' : 's').')</span></td>';
-			print '<td class="right amount">'.anychartlab_price($m['ledger']).'</td><td class="right amount">'.anychartlab_price($m['invoices']).'</td><td class="right amount"><b>'.anychartlab_price($m['ledger'] - $m['invoices']).'</b></td></tr>';
+			print '<td class="right amount">'.financialreporting_price($m['ledger']).'</td><td class="right amount">'.financialreporting_price($m['invoices']).'</td><td class="right amount"><b>'.financialreporting_price($m['ledger'] - $m['invoices']).'</b></td></tr>';
 		}
 		print '</table>';
 	}

@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — ledger-based Accounts Receivable / Accounts Payable.
+ * Financial Reporting — ledger-based Accounts Receivable / Accounts Payable.
  *
  * Built from the accounting ledger (llx_accounting_bookkeeping), not from invoices:
  * entries on the customer / supplier control accounts (Accounting setup:
@@ -17,7 +17,7 @@
  * @param string $type ar or ap
  * @return string[]
  */
-function anychartlab_aged_default_accounts($type)
+function financialreporting_aged_default_accounts($type)
 {
 	$acc = getDolGlobalString($type === 'ap' ? 'ACCOUNTING_ACCOUNT_SUPPLIER' : 'ACCOUNTING_ACCOUNT_CUSTOMER');
 	return ($acc !== '' ? array($acc) : array());
@@ -29,7 +29,7 @@ function anychartlab_aged_default_accounts($type)
  * @param string $basis due (days past due date) or doc (days since document date)
  * @return array<string,string> key => label
  */
-function anychartlab_aged_buckets($basis)
+function financialreporting_aged_buckets($basis)
 {
 	if ($basis === 'doc') {
 		return array('b0' => '0-30 days', 'b1' => '31-60', 'b2' => '61-90', 'b3' => '91-120', 'b4' => 'Over 120');
@@ -44,7 +44,7 @@ function anychartlab_aged_buckets($basis)
  * @param string $basis due or doc
  * @return string
  */
-function anychartlab_aged_bucket($days, $basis)
+function financialreporting_aged_bucket($days, $basis)
 {
 	if ($basis === 'doc') {
 		return ($days <= 30 ? 'b0' : ($days <= 60 ? 'b1' : ($days <= 90 ? 'b2' : ($days <= 120 ? 'b3' : 'b4'))));
@@ -63,10 +63,10 @@ function anychartlab_aged_bucket($days, $basis)
  * @param string   $basis    due or doc
  * @return array{parties:array,totals:array,total:float,nothirdparty:float,lettered:int,entries:int}
  */
-function anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis)
+function financialreporting_aged_build($db, $entity, $type, $accounts, $asof, $basis)
 {
 	$res = array('parties' => array(), 'totals' => array(), 'total' => 0.0, 'nothirdparty' => 0.0, 'lettered' => 0, 'entries' => 0);
-	foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+	foreach (array_keys(financialreporting_aged_buckets($basis)) as $k) {
 		$res['totals'][$k] = 0.0;
 	}
 	if (!$accounts) {
@@ -178,13 +178,13 @@ function anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis)
 			continue;
 		}
 		$party = array('code' => $p['code'], 'name' => $p['name'], 'items' => array(), 'buckets' => array(), 'total' => 0.0);
-		foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+		foreach (array_keys(financialreporting_aged_buckets($basis)) as $k) {
 			$party['buckets'][$k] = 0.0;
 		}
 		foreach ($items as $it) {
 			$days = (int) floor(($asof - ($basis === 'doc' ? $it['date'] : $it['due'])) / 86400);
 			$it['days'] = $days;
-			$it['bucket'] = anychartlab_aged_bucket($days, $basis);
+			$it['bucket'] = financialreporting_aged_bucket($days, $basis);
 			$party['buckets'][$it['bucket']] += $it['remain'];
 			$party['total'] += $it['remain'];
 			$party['items'][] = $it;
@@ -213,9 +213,9 @@ function anychartlab_aged_build($db, $entity, $type, $accounts, $asof, $basis)
  *
  * @return float
  */
-function anychartlab_aged_ledger_balance($db, $entity, $type, $accounts, $asof)
+function financialreporting_aged_ledger_balance($db, $entity, $type, $accounts, $asof)
 {
-	$bal = anychartlab_balances($db, $entity, null, $asof);
+	$bal = financialreporting_balances($db, $entity, null, $asof);
 	$sum = 0.0;
 	foreach ($accounts as $a) {
 		$sum += (float) ($bal[$a] ?? 0);
@@ -230,7 +230,7 @@ function anychartlab_aged_ledger_balance($db, $entity, $type, $accounts, $asof)
  *
  * @return array<string,array{name:string,remain:float,count:int}>
  */
-function anychartlab_aged_unpaid_invoices($db, $entity, $type)
+function financialreporting_aged_unpaid_invoices($db, $entity, $type)
 {
 	$out = array();
 	if ($type === 'ap') {
@@ -268,7 +268,7 @@ function anychartlab_aged_unpaid_invoices($db, $entity, $type)
  * @param string $basis due or doc
  * @return array<string,string>
  */
-function anychartlab_aged_buckets_short($basis)
+function financialreporting_aged_buckets_short($basis)
 {
 	if ($basis === 'doc') {
 		return array('b0' => '0-30', 'b1' => '31-60', 'b2' => '61-90', 'b3' => '91-120', 'b4' => '120+');
@@ -279,7 +279,7 @@ function anychartlab_aged_buckets_short($basis)
 /**
  * Build the aged report from Dolibarr's invoices instead of the ledger (for cash
  * accounting, where the ledger has no customer / supplier control accounts, or to
- * compare). Same result structure as anychartlab_aged_build().
+ * compare). Same result structure as financialreporting_aged_build().
  *
  * Amount still owing on each validated invoice at the date: total incl. tax, less
  * payments dated up to that date, less credit notes / deposits applied to it. An
@@ -293,10 +293,10 @@ function anychartlab_aged_buckets_short($basis)
  * @param string $basis  due or doc
  * @return array{parties:array,totals:array,total:float,nothirdparty:float,lettered:int,entries:int}
  */
-function anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis)
+function financialreporting_aged_build_invoices($db, $entity, $type, $asof, $basis)
 {
 	$res = array('parties' => array(), 'totals' => array(), 'total' => 0.0, 'nothirdparty' => 0.0, 'lettered' => 0, 'entries' => 0);
-	foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+	foreach (array_keys(financialreporting_aged_buckets($basis)) as $k) {
 		$res['totals'][$k] = 0.0;
 	}
 	$ap = ($type === 'ap');
@@ -338,7 +338,7 @@ function anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis)
 		if ($remain < 0) {
 			$item['unallocated'] = 1;
 		}
-		anychartlab_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, $item);
+		financialreporting_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, $item);
 	}
 	// Available credits (credit notes / deposits / overpayments converted to a discount, not used yet)
 	$sql = "SELECT r.fk_soc, r.datec, r.amount_ttc, r.description, s.nom, ".$code." as code FROM ".MAIN_DB_PREFIX."societe_remise_except as r INNER JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = r.fk_soc";
@@ -347,18 +347,18 @@ function anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis)
 	$resql = $db->query($sql);
 	while ($resql && ($o = $db->fetch_object($resql))) {
 		$date = $db->jdate($o->datec);
-		anychartlab_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, array('date' => $date, 'due' => $date, 'ref' => 'Available credit: '.dol_trunc((string) $o->description, 40), 'type' => 'credit', 'remain' => -(float) $o->amount_ttc, 'unallocated' => 1, 'url' => ''));
+		financialreporting_aged_add_item($byParty, (int) $o->fk_soc, (string) $o->nom, (string) $o->code, array('date' => $date, 'due' => $date, 'ref' => 'Available credit: '.dol_trunc((string) $o->description, 40), 'type' => 'credit', 'remain' => -(float) $o->amount_ttc, 'unallocated' => 1, 'url' => ''));
 	}
 
 	foreach ($byParty as $p) {
 		$party = array('code' => $p['code'], 'name' => $p['name'], 'items' => array(), 'buckets' => array(), 'total' => 0.0);
-		foreach (array_keys(anychartlab_aged_buckets($basis)) as $k) {
+		foreach (array_keys(financialreporting_aged_buckets($basis)) as $k) {
 			$party['buckets'][$k] = 0.0;
 		}
 		foreach ($p['items'] as $it) {
 			$days = (int) floor(($asof - ($basis === 'doc' ? $it['date'] : $it['due'])) / 86400);
 			$it['days'] = $days;
-			$it['bucket'] = anychartlab_aged_bucket($days, $basis);
+			$it['bucket'] = financialreporting_aged_bucket($days, $basis);
 			$party['buckets'][$it['bucket']] += $it['remain'];
 			$party['total'] += $it['remain'];
 			$party['items'][] = $it;
@@ -379,11 +379,11 @@ function anychartlab_aged_build_invoices($db, $entity, $type, $asof, $basis)
 }
 
 /**
- * Add an open item to a third party (helper of anychartlab_aged_build_invoices()).
+ * Add an open item to a third party (helper of financialreporting_aged_build_invoices()).
  *
  * @return void
  */
-function anychartlab_aged_add_item(&$byParty, $socid, $name, $code, $item)
+function financialreporting_aged_add_item(&$byParty, $socid, $name, $code, $item)
 {
 	if (!isset($byParty[$socid])) {
 		$byParty[$socid] = array('name' => $name, 'code' => $code, 'items' => array());

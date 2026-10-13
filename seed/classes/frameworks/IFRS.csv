@@ -1,0 +1,22 @@
+# label: IFRS (IAS 1; IFRS 18 replaces IAS 1 for periods from 1 January 2027)
+# review: unreviewed
+# notes: Statement of financial position: current / non-current split (or by liquidity when more relevant). Profit or loss: expenses by nature or by function; by function also requires employee costs and depreciation in the notes. IFRS 18 adds operating, investing and financing categories and the subtotal "operating profit".
+# Columns: class;heading;required;note   required: yes = a line or heading the framework requires; no = optional or notes only
+class;heading;required;note
+NONCURRENT_ASSET;Non-current assets (property, plant and equipment, intangible assets, investments);yes;
+CURRENT_ASSET;Current assets (inventories, trade and other receivables);yes;
+CASH;Cash and cash equivalents;yes;Bank overdrafts repayable on demand may be part of cash and cash equivalents
+NONCURRENT_LIABILITY;Non-current liabilities (borrowings, provisions, deferred tax);yes;
+CURRENT_LIABILITY;Current liabilities (trade and other payables, current borrowings, current tax);yes;
+EQUITY;Equity (share capital, reserves, retained earnings);yes;
+REVENUE;Revenue;yes;
+OTHER_OPERATING_INCOME;Other operating income;no;Operating category (IFRS 18)
+FINANCIAL_INCOME;Investment / finance income;yes;Investing or financing category (IFRS 18)
+NONRECURRING_INCOME;(no separate heading: extraordinary items are not allowed);no;Presented in the operating category
+COST_OF_SALES;Cost of sales (by function) / raw materials and consumables (by nature);yes;
+EMPLOYEE_COST;Employee benefits expense;yes;On the face (by nature) or in the notes (by function)
+DEPRECIATION;Depreciation, amortisation and impairment;yes;On the face (by nature) or in the notes (by function)
+OPERATING_EXPENSE;Other operating expenses / distribution and administrative expenses;no;
+FINANCE_COST;Finance costs;yes;
+NONRECURRING_EXPENSE;(no separate heading: extraordinary items are not allowed);no;Presented in the operating category
+INCOME_TAX;Income tax expense;yes;

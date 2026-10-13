@@ -1,0 +1,21 @@
+# Financial Reporting wizard template (columns explained in GENERIC-income-statement.csv).
+# label: Income Statement (Australia, multi-step with gross profit)
+# statement: IS
+# review: unreviewed
+# section REVENUE: Revenue
+# section COGS: Cost of sales
+# section OTHINC: Other income
+# section OPEX: Expenses
+# section TAX: Income tax
+section;section_type;code;label;type;natures;accounts;formula;sign
+REVENUE;INCOME;REVENUE;Revenue;group;;4;;
+COGS;EXPENSE;COGS;Cost of sales;group;;5;;
+COGS;;GROSS;Gross profit;formula;;;REVENUE-COGS;
+OTHINC;INCOME;OTHINC;Other income;group;;;;
+OPEX;EXPENSE;EMPLOY;Employment expenses;group;;64;;
+OPEX;EXPENSE;OPEX;Operating expenses;group;;6;;
+OPEX;EXPENSE;OTHEXP;Other expenses;group;;;;
+OPEX;;TOTEXP;Total expenses;formula;;;EMPLOY+OPEX+OTHEXP;
+OPEX;;NPBT;Net profit before tax;formula;;;GROSS+OTHINC-TOTEXP;
+TAX;EXPENSE;TAX;Income tax expense;group;INCOME|EXPENSE;99;;dc
+TAX;;NPAT;Net profit after tax;formula;;;NPBT-TAX;

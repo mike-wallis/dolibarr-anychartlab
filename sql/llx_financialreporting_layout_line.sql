@@ -1,5 +1,5 @@
--- Any-Chart Reports Lab (prototype): lines of a statement layout.
-CREATE TABLE llx_anychartlab_layout_line (
+-- Financial Reporting: lines of a statement layout.
+CREATE TABLE llx_financialreporting_layout_line (
   rowid      integer AUTO_INCREMENT PRIMARY KEY,
   fk_layout  integer NOT NULL,
   position   integer DEFAULT 0 NOT NULL,

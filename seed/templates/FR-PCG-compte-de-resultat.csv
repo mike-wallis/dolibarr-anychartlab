@@ -1,0 +1,40 @@
+# Financial Reporting wizard template (columns explained in GENERIC-income-statement.csv).
+# label: Compte de résultat (France, PCG, par nature)
+# statement: IS
+# review: unreviewed
+# section PROD_EXPL: Produits d'exploitation
+# section CH_EXPL: Charges d'exploitation
+# section FIN: Financier
+# section EXC: Exceptionnel
+# section IMPOTS: Participation et impôts sur les bénéfices
+# section DIVERS: Non classés
+section;section_type;code;label;type;natures;accounts;formula;sign
+PROD_EXPL;INCOME;VENTES;Chiffre d'affaires (ventes de marchandises, production vendue);group;;70;;
+PROD_EXPL;INCOME;PROD_STOCKEE;Production stockée;group;INCOME|EXPENSE;71;;cd
+PROD_EXPL;INCOME;PROD_IMMO;Production immobilisée;group;;72;;
+PROD_EXPL;INCOME;SUBV_EXPL;Subventions d'exploitation;group;;74;;
+PROD_EXPL;INCOME;REPRISES_EXPL;Reprises sur amortissements, dépréciations et provisions, transferts de charges;group;;781,791;;
+PROD_EXPL;INCOME;AUTRES_PROD;Autres produits;group;;75;;
+PROD_EXPL;;TOT_PROD_EXPL;Total produits d'exploitation;formula;;;VENTES+PROD_STOCKEE+PROD_IMMO+SUBV_EXPL+REPRISES_EXPL+AUTRES_PROD;
+CH_EXPL;EXPENSE;ACHATS_MARCH;Achats de marchandises (y compris variation de stocks);group;EXPENSE|INCOME;607,6037,6087,6097;;dc
+CH_EXPL;EXPENSE;ACHATS_MP;Achats de matières premières et approvisionnements (y compris variation de stocks);group;EXPENSE|INCOME;601,602,6031,6032,6081,6082,6091,6092;;dc
+CH_EXPL;EXPENSE;CHARGES_EXT;Autres achats et charges externes;group;;60,61,62;;
+CH_EXPL;EXPENSE;IMPOTS_TAXES;Impôts, taxes et versements assimilés;group;;63;;
+CH_EXPL;EXPENSE;SALAIRES;Salaires et traitements;group;;641,644;;
+CH_EXPL;EXPENSE;CHARGES_SOC;Charges sociales;group;;645,646,647,648;;
+CH_EXPL;EXPENSE;DOTATIONS_EXPL;Dotations aux amortissements, dépréciations et provisions;group;;681;;
+CH_EXPL;EXPENSE;AUTRES_CHARGES;Autres charges;group;;65;;
+CH_EXPL;;TOT_CH_EXPL;Total charges d'exploitation;formula;;;ACHATS_MARCH+ACHATS_MP+CHARGES_EXT+IMPOTS_TAXES+SALAIRES+CHARGES_SOC+DOTATIONS_EXPL+AUTRES_CHARGES;
+CH_EXPL;;RES_EXPL;RÉSULTAT D'EXPLOITATION;formula;;;TOT_PROD_EXPL-TOT_CH_EXPL;
+FIN;INCOME;PROD_FIN;Produits financiers;group;;76,786,796;;
+FIN;EXPENSE;CHARGES_FIN;Charges financières;group;;66,686;;
+FIN;;RES_FIN;RÉSULTAT FINANCIER;formula;;;PROD_FIN-CHARGES_FIN;
+FIN;;RES_COURANT;RÉSULTAT COURANT AVANT IMPÔTS;formula;;;RES_EXPL+RES_FIN;
+EXC;INCOME;PROD_EXC;Produits exceptionnels;group;;77,787,797;;
+EXC;EXPENSE;CHARGES_EXC;Charges exceptionnelles;group;;67,687;;
+EXC;;RES_EXC;RÉSULTAT EXCEPTIONNEL;formula;;;PROD_EXC-CHARGES_EXC;
+IMPOTS;EXPENSE;PARTICIPATION;Participation des salariés aux résultats;group;;691;;
+IMPOTS;EXPENSE;IMPOT_BEN;Impôts sur les bénéfices;group;EXPENSE|INCOME;69;;dc
+DIVERS;INCOME;AUTRES_PROD_DIV;Autres produits non classés;group;;;;
+DIVERS;EXPENSE;AUTRES_CH_DIV;Autres charges non classées;group;;;;
+DIVERS;;RESULTAT;BÉNÉFICE OU PERTE;formula;;;RES_COURANT+RES_EXC-PARTICIPATION-IMPOT_BEN+AUTRES_PROD_DIV-AUTRES_CH_DIV;

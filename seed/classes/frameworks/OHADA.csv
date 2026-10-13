@@ -1,0 +1,21 @@
+# label: SYSCOHADA révisé (17 OHADA member states, in force since 2018)
+# review: unreviewed
+# notes: Bilan : actif immobilisé, actif circulant (dont HAO), trésorerie-actif / capitaux propres et ressources assimilées, dettes financières et ressources assimilées, passif circulant, trésorerie-passif. Compte de résultat en soldes successifs : marge commerciale, valeur ajoutée, excédent brut d'exploitation, résultat d'exploitation, résultat financier, résultat des activités ordinaires, résultat hors activités ordinaires (HAO), impôt, résultat net.
+class;heading;required;note
+NONCURRENT_ASSET;Actif immobilisé;yes;
+CURRENT_ASSET;Actif circulant (stocks, créances, actif circulant HAO);yes;
+CASH;Trésorerie-actif ; trésorerie-passif (au passif);yes;Shown on its own on both sides
+NONCURRENT_LIABILITY;Dettes financières et ressources assimilées;yes;
+CURRENT_LIABILITY;Passif circulant;yes;
+EQUITY;Capitaux propres et ressources assimilées;yes;
+REVENUE;Chiffre d'affaires (ventes de marchandises, de produits, travaux, services);yes;The trading margin uses sales of goods only: split with a reporting group
+OTHER_OPERATING_INCOME;Production stockée et immobilisée, subventions d'exploitation, autres produits;yes;
+FINANCIAL_INCOME;Revenus financiers et assimilés;yes;Résultat financier
+NONRECURRING_INCOME;Produits hors activités ordinaires (HAO);yes;Résultat HAO
+COST_OF_SALES;Achats de marchandises et de matières, variation de stocks;yes;
+EMPLOYEE_COST;Charges de personnel;yes;
+DEPRECIATION;Dotations aux amortissements, provisions et dépréciations;yes;
+OPERATING_EXPENSE;Transports, services extérieurs, impôts et taxes, autres charges;yes;
+FINANCE_COST;Frais financiers et charges assimilées;yes;Résultat financier
+NONRECURRING_EXPENSE;Charges hors activités ordinaires (HAO);yes;Résultat HAO
+INCOME_TAX;Impôts sur le résultat ; participation des travailleurs;yes;

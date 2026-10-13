@@ -1,0 +1,21 @@
+# label: France - Plan comptable général (règlement ANC 2014-03)
+# review: unreviewed
+# notes: Bilan : actif immobilisé, actif circulant, comptes de régularisation / capitaux propres, provisions, dettes. Compte de résultat par nature, en trois niveaux : exploitation, financier, exceptionnel, puis participation et impôts. Modèles de base, abrégé et développé ; la liasse fiscale (2050 à 2059) suit le même plan.
+class;heading;required;note
+NONCURRENT_ASSET;Actif immobilisé (incorporel, corporel, financier);yes;
+CURRENT_ASSET;Actif circulant (stocks, créances, VMP) et comptes de régularisation;yes;
+CASH;Disponibilités ; concours bancaires courants (au passif);yes;
+NONCURRENT_LIABILITY;Provisions ; emprunts et dettes financières;yes;
+CURRENT_LIABILITY;Dettes fournisseurs, fiscales et sociales, autres dettes;yes;
+EQUITY;Capitaux propres;yes;
+REVENUE;Chiffre d'affaires (ventes de marchandises, production vendue);yes;
+OTHER_OPERATING_INCOME;Production stockée et immobilisée, subventions, reprises, autres produits;yes;
+FINANCIAL_INCOME;Produits financiers;yes;Résultat financier
+NONRECURRING_INCOME;Produits exceptionnels;yes;Résultat exceptionnel
+COST_OF_SALES;Achats de marchandises et de matières, variation des stocks;yes;
+EMPLOYEE_COST;Salaires et traitements ; charges sociales;yes;
+DEPRECIATION;Dotations aux amortissements, dépréciations et provisions;yes;
+OPERATING_EXPENSE;Autres achats et charges externes ; impôts et taxes ; autres charges;yes;
+FINANCE_COST;Charges financières;yes;Résultat financier
+NONRECURRING_EXPENSE;Charges exceptionnelles;yes;Résultat exceptionnel
+INCOME_TAX;Participation des salariés ; impôts sur les bénéfices;yes;

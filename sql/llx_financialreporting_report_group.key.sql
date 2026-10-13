@@ -1,0 +1,2 @@
+ALTER TABLE llx_financialreporting_report_group ADD UNIQUE INDEX uk_financialreporting_report_group (fk_category);
+ALTER TABLE llx_financialreporting_report_group ADD INDEX idx_financialreporting_report_group_report (fk_report);

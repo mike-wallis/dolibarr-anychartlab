@@ -1,0 +1,21 @@
+# label: EU accounting directive 2013/34/EU (each member state sets its own layout and wording from it)
+# review: unreviewed
+# notes: Balance sheet: horizontal (Annex III) or vertical (Annex IV) layout; creditors split between amounts due within and after one year. Profit and loss: by nature (Annex V) or by function (Annex VI). Items keep the order of the annexes; member states may require more detail. Check your own country's layout and line names.
+class;heading;required;note
+NONCURRENT_ASSET;C. Fixed assets (intangible, tangible, financial);yes;
+CURRENT_ASSET;D. Current assets (stocks, debtors, investments) and E. Prepayments and accrued income;yes;
+CASH;D.IV Cash at bank and in hand;yes;
+NONCURRENT_LIABILITY;Provisions, and creditors due after more than one year;yes;
+CURRENT_LIABILITY;Creditors due within one year;yes;
+EQUITY;A. Capital and reserves;yes;
+REVENUE;1. Net turnover;yes;
+OTHER_OPERATING_INCOME;2.-4. Change in stocks, work capitalised, other operating income;yes;By nature (Annex V)
+FINANCIAL_INCOME;Income from participating interests, other investments and interest receivable;yes;
+NONRECURRING_INCOME;(no separate heading since 2013);no;Included in other operating income
+COST_OF_SALES;5. Raw materials and consumables (incl. change in stocks of goods);yes;By function: 2. Cost of sales
+EMPLOYEE_COST;6. Staff costs;yes;By nature (Annex V)
+DEPRECIATION;7. Value adjustments (depreciation, amortisation);yes;By nature (Annex V)
+OPERATING_EXPENSE;5.(b) Other external expenses and 8. Other operating expenses;yes;
+FINANCE_COST;Interest payable and similar expenses;yes;
+NONRECURRING_EXPENSE;(no separate heading since 2013);no;Included in other operating expenses
+INCOME_TAX;Tax on profit or loss;yes;

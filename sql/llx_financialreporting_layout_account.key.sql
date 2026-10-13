@@ -1,0 +1,1 @@
+ALTER TABLE llx_financialreporting_layout_account ADD UNIQUE INDEX uk_financialreporting_layout_account (fk_layout_line, fk_accounting_account);

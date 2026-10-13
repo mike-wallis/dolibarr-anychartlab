@@ -1,14 +1,20 @@
-# Any-Chart Reports Lab (prototype)
+# Financial Reporting
 
-A **test module** for Dolibarr issue
-[#31760](https://github.com/Dolibarr/dolibarr/issues/31760): a Balance Sheet and Income Statement
-that work with **any chart of accounts**, not just one country's numbering.
+Balance Sheet, Income Statement, Trial Balance, Cash Flow and aged receivables / payables that
+work with **any chart of accounts** and any country, not just one country's numbering. Built for
+Dolibarr issue [#31760](https://github.com/Dolibarr/dolibarr/issues/31760): the aim is a free module
+on DoliStore, then Dolibarr core.
 
-It is a prototype to try a design on real charts and collect feedback before proposing it for
-Dolibarr core. **It changes nothing in your accounting.** It only reads your ledger, and keeps its
-own settings in its own tables.
+**It changes nothing in your accounting.** It reads your ledger and keeps its settings in its own
+tables. The one exception is the Report wizard, which can create **new** Dolibarr personalised
+reports. It never changes existing ones, the chart of accounts or the ledger.
 
-> **Status: prototype (v0.2), for testing and feedback.** Not a finished module: please try it on a
+> **Renamed:** this module was the prototype "Any-Chart Reports Lab" (folder `anychartlab`). If you
+> installed the prototype, disable and remove it before installing this one. Its natures and
+> layouts don't carry over automatically: export your natures as CSV from the old module first, then
+> import them here.
+
+> **Status: development version (v0.3), for testing and feedback.** Not a finished module: please try it on a
 > copy of your database or a test install first, and report problems on
 > [#31760](https://github.com/Dolibarr/dolibarr/issues/31760) or in this repository's Issues.
 
@@ -36,18 +42,21 @@ Two optional extras per account:
 1. Requirements: Dolibarr 23 or later, Double-entry Accounting module enabled, a chart of accounts
    selected (Accounting > Setup).
 2. Install it, either way:
-   - **Zip** (easiest): download `module_anychartlab-x.y.zip` from this repository's
+   - **Zip** (easiest): download `module_financialreporting-x.y.zip` from this repository's
      [Releases](https://github.com/mike-wallis/dolibarr-anychartlab/releases) and upload it in
      Setup > Modules > **Deploy/install external app/module**.
    - **Git**: from `htdocs/custom/`, run
-     `git clone https://github.com/mike-wallis/dolibarr-anychartlab.git anychartlab`
-     (the folder must be called `anychartlab`).
+     `git clone https://github.com/mike-wallis/dolibarr-anychartlab.git financialreporting`
+     (the folder must be called `financialreporting`).
 
-   Then enable **Any-Chart Reports Lab** in Setup > Modules (section Financial).
-3. Give yourself the two permissions (Users & Groups > your user > Permissions > Any-Chart Reports
-   Lab).
-4. Go to Accounting > **Any-Chart Reports Lab > Setup** (the setup pages are listed under it once
-   clicked) > **Account natures**. On first use the module looks at
+   Then enable **Financial Reporting** in Setup > Modules (section Financial).
+3. Give yourself the two permissions (Users & Groups > your user > Permissions > Financial Reporting).
+4. Go to Accounting > **Financial Reporting > Setup > Getting started** (also the settings icon of
+   the module in Setup > Modules). It walks you through the basics, account natures, a review of
+   balances on the wrong side, and an optional income statement. Until setup is complete the
+   report pages show what is missing. The steps below describe the same pages in more detail.
+
+   Manually: **Setup > Account natures**. On first use the module looks at
    your company country (Setup > Company) and your chart, and suggests a rule set and layouts:
    click **Apply suggestions**. Or pick a **Rule set** and click **Apply default natures**. Rules
    come from the chosen rule set, then `seed/generic.csv`, then the parent account.
@@ -72,7 +81,7 @@ Two optional extras per account:
 
 ## Trial Balance
 
-Accounting > Any-Chart Reports Lab > **Trial Balance**: every account with a balance or a movement
+Accounting > Financial Reporting > **Trial Balance**: every account with a balance or a movement
 in the period: opening balance, debits, credits and closing balance (debit / credit columns), with
 its nature. In account order, or **grouped by nature** with subtotals. Entries come from the same
 window as the Balance Sheet (after the last closed fiscal year), so the closing balances are the
@@ -82,7 +91,7 @@ out of the statements). CSV / PDF (landscape).
 
 ## Cash Flow statement
 
-Accounting > Any-Chart Reports Lab > **Cash Flow** (indirect method): the profit for the period,
+Accounting > Financial Reporting > **Cash Flow** (indirect method): the profit for the period,
 then the movement of every other balance sheet account in its **cash flow class**: operating
 (working capital; non-cash items such as depreciation are added back), investing (fixed assets) or
 financing (loans, equity). **Cash** = the accounting accounts of Dolibarr's bank and cash accounts
@@ -101,7 +110,7 @@ that adds the new column to its table. Nothing else is changed.
 
 ## Accounts Receivable / Accounts Payable (from the ledger)
 
-Accounting > Any-Chart Reports Lab > **Accounts Receivable** / **Accounts Payable**: what each
+Accounting > Financial Reporting > **Accounts Receivable** / **Accounts Payable**: what each
 customer owes / what is owed to each supplier, from the accounting ledger (entries on the customer
 / supplier control account set in Accounting > Setup, per subledger account). Open items use
 Dolibarr lettering where entries are lettered; otherwise payments and credit notes are matched to
@@ -122,16 +131,43 @@ receivables or payables. The other reports read the ledger and work in both mode
 accounting the Income Statement is a cash-basis result and the Balance Sheet has no trade debtors /
 creditors).
 
-## Layouts (country presentation)
+## Report wizard (income statement)
+
+Accounting > Financial Reporting > Setup > **Report wizard** builds your income statement as a
+Dolibarr **personalised report** (Accounting > Setup > Personalised groups):
+
+1. Pick a template: generic, Australia or France so far. The one for your chart or country is marked
+   ★. Each template has notes on the country's rules, and a reminder to check the layout with your
+   accountant.
+2. Go through it one section at a time (for example Revenue, Cost of sales, Other income,
+   Expenses, Income tax). For each group, set the account number prefixes it takes. You see which
+   accounts each group gets, and which are in no group yet. Add or delete groups and formula lines.
+   An account goes to the group with the **longest** matching prefix (64 beats 6); a group with no
+   prefix takes what is left.
+3. Check and save. The wizard previews the report for the current fiscal year to date and checks
+   that its last line equals the result from the ledger. Saving creates a **new** personalised
+   report. Every line is shown as a positive amount, and formulas subtract expenses.
+
+**What it writes:** only new rows in Dolibarr's personalised group tables (the report, its groups,
+and the link between accounts and groups), plus two small tables of its own. Existing reports, the
+chart of accounts and the ledger are not changed. A report built by the wizard can be deleted from
+the wizard page, and *Re-apply rules* adds accounts created since.
+
+**Note:** Dolibarr's own Personalized report page only reads the older one-group-per-account link,
+so wizard-built reports show in this module's Income Statement, not on that page. The Income
+Statement's Layout selector lists every personalised report (read live, nothing copied), then the
+advanced layouts below.
+
+## Advanced layouts (country presentation)
 
 Reports can be shown **by nature** (assets / liabilities / equity, income / expenses) or through a
 **layout**: the lines your country uses, e.g. current / non-current assets, gross profit.
-Accounting > Any-Chart Reports Lab > Setup > **Layouts**:
+Accounting > Financial Reporting > Setup > **Advanced layouts** (for most users the Report wizard above is simpler):
 
 - **Load a layout file**: samples in `seed/layouts/`: Australia (AU-BASE numbering) and France
   (PCG: Bilan, Compte de résultat). Files suggested for your chart or country are marked ★.
 - **Copy a Dolibarr personalised report**: reads Accounting > Setup > Personalised groups and makes
-  a lab copy. **Your personalised groups are never changed.**
+  a lab copy. Copying never changes your personalised groups (only the Report wizard writes to them, and only new reports).
 - **Import a layout CSV**, or start from an **empty layout**.
 - Edit it on screen: lines are *headings*, *groups* (take accounts by nature and/or account-number
   prefixes such as `11,12,!1301,512D`, or by explicitly picked accounts) and *formulas* (e.g.
@@ -143,7 +179,7 @@ Accounting > Any-Chart Reports Lab > Setup > **Layouts**:
 
 ## Display settings
 
-Accounting > Any-Chart Reports Lab > Setup > **Display**: PDF paper size, orientation and margins; font,
+Accounting > Financial Reporting > Setup > **Display**: PDF paper size, orientation and margins; font,
 font size, title size and indent; heading (company name, a custom heading text, logo, period line);
 footer (text, printed date, page numbers); which PDF columns to show; negative amounts as -1,234.56
 or (1,234.56); 2 decimals or whole units; which view / options a report opens with; and

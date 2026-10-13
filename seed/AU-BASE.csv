@@ -1,4 +1,4 @@
-# Any-Chart Reports Lab: rules for AU-BASE (Australia). Most specific first; first match wins.
+# Financial Reporting: rules for AU-BASE (Australia). Most specific first; first match wins.
 # Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
 pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
 ASSET;1301|1321|1331;;ASSET;;1;Accumulated depreciation: contra-asset

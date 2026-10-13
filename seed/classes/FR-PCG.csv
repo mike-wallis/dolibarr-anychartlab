@@ -1,0 +1,21 @@
+# Financial Reporting: class rules for the French Plan comptable général (national numbering), also
+# used for the other charts listed for FR-PCG in seed/catalog.csv. Not yet reviewed by an expert-comptable.
+# Columns as in generic.csv. First match wins, so more specific prefixes come first.
+nature;pcg_type;account_prefix;label_contains;class;comment
+ASSET|LIABILITY;;519|512|514|515|516|517|51|53|54|58;;CASH;Banques, caisse, régies, virements internes; concours bancaires courants (519)
+ASSET;;20|21|22|23|25|26|27|28|29;;NONCURRENT_ASSET;Immobilisations, amortissements et dépréciations des immobilisations
+ASSET;;3|4|50;;CURRENT_ASSET;Stocks, tiers, valeurs mobilières de placement
+LIABILITY;;15|16|17;;NONCURRENT_LIABILITY;Provisions, emprunts et dettes assimilées, dettes rattachées à des participations
+LIABILITY;;4;;CURRENT_LIABILITY;Dettes fournisseurs, fiscales et sociales, autres dettes
+EQUITY;;;;EQUITY;Capitaux propres (10 à 14)
+INCOME;;70;;REVENUE;Ventes de produits, marchandises et services
+INCOME;;76|786|796;;FINANCIAL_INCOME;Produits financiers
+INCOME;;77|787|797;;NONRECURRING_INCOME;Produits exceptionnels
+INCOME;;71|72|73|74|75|78|79;;OTHER_OPERATING_INCOME;Production stockée et immobilisée, subventions, autres produits, reprises
+EXPENSE;;601|602|603|607|608|609;;COST_OF_SALES;Achats de marchandises, matières et approvisionnements, variation des stocks
+EXPENSE;;64;;EMPLOYEE_COST;Charges de personnel
+EXPENSE;;681;;DEPRECIATION;Dotations d'exploitation
+EXPENSE;;66|686;;FINANCE_COST;Charges financières
+EXPENSE;;67|687;;NONRECURRING_EXPENSE;Charges exceptionnelles
+EXPENSE;;69;;INCOME_TAX;Participation des salariés, impôts sur les bénéfices
+EXPENSE;;60|61|62|63|65;;OPERATING_EXPENSE;Achats non stockés, services extérieurs, impôts et taxes, autres charges

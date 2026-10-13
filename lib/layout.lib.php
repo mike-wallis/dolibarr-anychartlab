@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — statement layouts.
+ * Financial Reporting — statement layouts.
  *
  * A layout is an ordered list of lines:
  *   heading  a title (e.g. "Current assets")
@@ -12,15 +12,16 @@
  * then rules by position). Accounts no line takes are reported as "Not in layout",
  * never dropped.
  *
- * Layouts live in this module's own tables. Dolibarr's personalised groups
+ * Layouts live in this module's own tables. Here, Dolibarr's personalised groups
  * (llx_c_accounting_report / llx_c_accounting_category) are only READ, to make a
- * copy. Nothing is ever written to them.
+ * copy. (The report wizard, lib/wizard.lib.php, is the one place that writes them,
+ * and only new reports.)
  */
 
 /**
  * @return array<string,string>
  */
-function anychartlab_layout_types()
+function financialreporting_layout_types()
 {
 	return array('heading' => 'Heading', 'group' => 'Group of accounts', 'formula' => 'Formula');
 }
@@ -28,7 +29,7 @@ function anychartlab_layout_types()
 /**
  * @return array<string,string>
  */
-function anychartlab_layout_signs()
+function financialreporting_layout_signs()
 {
 	return array('natural' => 'Natural (by nature)', 'cd' => 'Credit − debit', 'dc' => 'Debit − credit');
 }
@@ -39,11 +40,11 @@ function anychartlab_layout_signs()
  * @param string $statement '' for all, BS or IS
  * @return array<int,object>
  */
-function anychartlab_layouts_list($db, $entity, $statement = '')
+function financialreporting_layouts_list($db, $entity, $statement = '')
 {
 	$out = array();
-	$sql = "SELECT l.rowid, l.code, l.label, l.statement, l.country_code, l.source, l.source_ref, (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."anychartlab_layout_line as ll WHERE ll.fk_layout = l.rowid) as nblines";
-	$sql .= " FROM ".MAIN_DB_PREFIX."anychartlab_layout as l WHERE l.entity = ".((int) $entity);
+	$sql = "SELECT l.rowid, l.code, l.label, l.statement, l.country_code, l.source, l.source_ref, (SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."financialreporting_layout_line as ll WHERE ll.fk_layout = l.rowid) as nblines";
+	$sql .= " FROM ".MAIN_DB_PREFIX."financialreporting_layout as l WHERE l.entity = ".((int) $entity);
 	if ($statement !== '') {
 		$sql .= " AND l.statement = '".$db->escape($statement)."'";
 	}
@@ -65,23 +66,23 @@ function anychartlab_layouts_list($db, $entity, $statement = '')
  * @param int    $entity
  * @return object|null  ->lines (ordered), ->explicit [lineid => [accountid,...]]
  */
-function anychartlab_layout_fetch($db, $id, $entity)
+function financialreporting_layout_fetch($db, $id, $entity)
 {
-	$resql = $db->query("SELECT rowid, code, label, statement, country_code, source, source_ref FROM ".MAIN_DB_PREFIX."anychartlab_layout WHERE rowid = ".((int) $id)." AND entity = ".((int) $entity));
+	$resql = $db->query("SELECT rowid, code, label, statement, country_code, source, source_ref FROM ".MAIN_DB_PREFIX."financialreporting_layout WHERE rowid = ".((int) $id)." AND entity = ".((int) $entity));
 	$layout = ($resql ? $db->fetch_object($resql) : null);
 	if (!$layout) {
 		return null;
 	}
 	$layout->lines = array();
 	$layout->explicit = array();
-	$resql = $db->query("SELECT rowid, position, code, label, type, natures, accounts, formula, sign FROM ".MAIN_DB_PREFIX."anychartlab_layout_line WHERE fk_layout = ".((int) $id)." ORDER BY position, rowid");
+	$resql = $db->query("SELECT rowid, position, code, label, type, natures, accounts, formula, sign FROM ".MAIN_DB_PREFIX."financialreporting_layout_line WHERE fk_layout = ".((int) $id)." ORDER BY position, rowid");
 	if ($resql) {
 		while ($obj = $db->fetch_object($resql)) {
 			$layout->lines[] = $obj;
 			$layout->explicit[(int) $obj->rowid] = array();
 		}
 	}
-	$resql = $db->query("SELECT la.fk_layout_line, la.fk_accounting_account FROM ".MAIN_DB_PREFIX."anychartlab_layout_account as la INNER JOIN ".MAIN_DB_PREFIX."anychartlab_layout_line as ll ON ll.rowid = la.fk_layout_line WHERE ll.fk_layout = ".((int) $id));
+	$resql = $db->query("SELECT la.fk_layout_line, la.fk_accounting_account FROM ".MAIN_DB_PREFIX."financialreporting_layout_account as la INNER JOIN ".MAIN_DB_PREFIX."financialreporting_layout_line as ll ON ll.rowid = la.fk_layout_line WHERE ll.fk_layout = ".((int) $id));
 	if ($resql) {
 		while ($obj = $db->fetch_object($resql)) {
 			$layout->explicit[(int) $obj->fk_layout_line][] = (int) $obj->fk_accounting_account;
@@ -95,25 +96,25 @@ function anychartlab_layout_fetch($db, $id, $entity)
  *
  * @return int new id, <0 on error
  */
-function anychartlab_layout_create($db, $entity, $code, $label, $statement, $country, $source, $sourceRef)
+function financialreporting_layout_create($db, $entity, $code, $label, $statement, $country, $source, $sourceRef)
 {
 	$code = strtoupper(preg_replace('/[^A-Za-z0-9_-]/', '', $code) ?: 'LAYOUT');
 	$base = substr($code, 0, 28);
 	$n = 1;
 	while (true) {
-		$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_layout WHERE entity = ".((int) $entity)." AND code = '".$db->escape($code)."'");
+		$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."financialreporting_layout WHERE entity = ".((int) $entity)." AND code = '".$db->escape($code)."'");
 		if (!$resql || !$db->fetch_object($resql)) {
 			break;
 		}
 		$code = $base.'-'.(++$n);
 	}
-	$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_layout (entity, code, label, statement, country_code, source, source_ref) VALUES (";
+	$sql = "INSERT INTO ".MAIN_DB_PREFIX."financialreporting_layout (entity, code, label, statement, country_code, source, source_ref) VALUES (";
 	$sql .= ((int) $entity).", '".$db->escape($code)."', '".$db->escape($label ?: $code)."', '".($statement === 'IS' ? 'IS' : 'BS')."', ";
 	$sql .= ($country !== '' ? "'".$db->escape($country)."'" : "NULL").", '".$db->escape($source)."', ".($sourceRef !== '' ? "'".$db->escape($sourceRef)."'" : "NULL").")";
 	if (!$db->query($sql)) {
 		return -1;
 	}
-	return (int) $db->last_insert_id(MAIN_DB_PREFIX."anychartlab_layout");
+	return (int) $db->last_insert_id(MAIN_DB_PREFIX."financialreporting_layout");
 }
 
 /**
@@ -122,11 +123,11 @@ function anychartlab_layout_create($db, $entity, $code, $label, $statement, $cou
  * @param array $d
  * @return array
  */
-function anychartlab_layout_clean_line($d)
+function financialreporting_layout_clean_line($d)
 {
-	$types = anychartlab_layout_types();
-	$signs = anychartlab_layout_signs();
-	$natures = anychartlab_natures();
+	$types = financialreporting_layout_types();
+	$signs = financialreporting_layout_signs();
+	$natures = financialreporting_natures();
 	$nat = array();
 	foreach (preg_split('/[|,; ]+/', strtoupper((string) ($d['natures'] ?? ''))) as $v) {
 		if (isset($natures[$v])) {
@@ -150,9 +151,9 @@ function anychartlab_layout_clean_line($d)
  *
  * @return int line id, <0 on error
  */
-function anychartlab_layout_save_line($db, $layoutId, $lineId, $data)
+function financialreporting_layout_save_line($db, $layoutId, $lineId, $data)
 {
-	$d = anychartlab_layout_clean_line($data);
+	$d = financialreporting_layout_clean_line($data);
 	if ($d['code'] === '') {
 		$d['code'] = 'L'.($d['position'] ?: mt_rand(100, 999));
 	}
@@ -162,16 +163,16 @@ function anychartlab_layout_save_line($db, $layoutId, $lineId, $data)
 	$set .= ", formula = ".($d['formula'] !== '' ? "'".$db->escape($d['formula'])."'" : "NULL");
 	$set .= ", sign = '".$db->escape($d['sign'])."'";
 	if ($lineId > 0) {
-		return $db->query("UPDATE ".MAIN_DB_PREFIX."anychartlab_layout_line SET ".$set." WHERE rowid = ".((int) $lineId)." AND fk_layout = ".((int) $layoutId)) ? $lineId : -1;
+		return $db->query("UPDATE ".MAIN_DB_PREFIX."financialreporting_layout_line SET ".$set." WHERE rowid = ".((int) $lineId)." AND fk_layout = ".((int) $layoutId)) ? $lineId : -1;
 	}
-	$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_layout_line (fk_layout, position, code, label, type, natures, accounts, formula, sign) VALUES (";
+	$sql = "INSERT INTO ".MAIN_DB_PREFIX."financialreporting_layout_line (fk_layout, position, code, label, type, natures, accounts, formula, sign) VALUES (";
 	$sql .= ((int) $layoutId).", ".((int) $d['position']).", '".$db->escape($d['code'])."', '".$db->escape($d['label'] ?: $d['code'])."', '".$db->escape($d['type'])."', ";
 	$sql .= ($d['natures'] !== '' ? "'".$db->escape($d['natures'])."'" : "NULL").", ".($d['accounts'] !== '' ? "'".$db->escape($d['accounts'])."'" : "NULL").", ";
 	$sql .= ($d['formula'] !== '' ? "'".$db->escape($d['formula'])."'" : "NULL").", '".$db->escape($d['sign'])."')";
 	if (!$db->query($sql)) {
 		return -1;
 	}
-	return (int) $db->last_insert_id(MAIN_DB_PREFIX."anychartlab_layout_line");
+	return (int) $db->last_insert_id(MAIN_DB_PREFIX."financialreporting_layout_line");
 }
 
 /**
@@ -182,12 +183,12 @@ function anychartlab_layout_save_line($db, $layoutId, $lineId, $data)
  * @param int[]  $accountIds
  * @return void
  */
-function anychartlab_layout_set_explicit($db, $lineId, $accountIds)
+function financialreporting_layout_set_explicit($db, $lineId, $accountIds)
 {
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout_account WHERE fk_layout_line = ".((int) $lineId));
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout_account WHERE fk_layout_line = ".((int) $lineId));
 	foreach (array_unique(array_map('intval', $accountIds)) as $aid) {
 		if ($aid > 0) {
-			$db->query("INSERT INTO ".MAIN_DB_PREFIX."anychartlab_layout_account (fk_layout_line, fk_accounting_account) VALUES (".((int) $lineId).", ".$aid.")");
+			$db->query("INSERT INTO ".MAIN_DB_PREFIX."financialreporting_layout_account (fk_layout_line, fk_accounting_account) VALUES (".((int) $lineId).", ".$aid.")");
 		}
 	}
 }
@@ -195,20 +196,20 @@ function anychartlab_layout_set_explicit($db, $lineId, $accountIds)
 /**
  * @return void
  */
-function anychartlab_layout_delete_line($db, $layoutId, $lineId)
+function financialreporting_layout_delete_line($db, $layoutId, $lineId)
 {
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout_account WHERE fk_layout_line = ".((int) $lineId));
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout_line WHERE rowid = ".((int) $lineId)." AND fk_layout = ".((int) $layoutId));
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout_account WHERE fk_layout_line = ".((int) $lineId));
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout_line WHERE rowid = ".((int) $lineId)." AND fk_layout = ".((int) $layoutId));
 }
 
 /**
  * @return void
  */
-function anychartlab_layout_delete($db, $entity, $layoutId)
+function financialreporting_layout_delete($db, $entity, $layoutId)
 {
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout_account WHERE fk_layout_line IN (SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_layout_line WHERE fk_layout = ".((int) $layoutId).")");
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout_line WHERE fk_layout = ".((int) $layoutId));
-	$db->query("DELETE FROM ".MAIN_DB_PREFIX."anychartlab_layout WHERE rowid = ".((int) $layoutId)." AND entity = ".((int) $entity));
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout_account WHERE fk_layout_line IN (SELECT rowid FROM ".MAIN_DB_PREFIX."financialreporting_layout_line WHERE fk_layout = ".((int) $layoutId).")");
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout_line WHERE fk_layout = ".((int) $layoutId));
+	$db->query("DELETE FROM ".MAIN_DB_PREFIX."financialreporting_layout WHERE rowid = ".((int) $layoutId)." AND entity = ".((int) $entity));
 }
 
 /**
@@ -216,16 +217,16 @@ function anychartlab_layout_delete($db, $entity, $layoutId)
  *
  * @return void
  */
-function anychartlab_layout_renumber($db, $layoutId)
+function financialreporting_layout_renumber($db, $layoutId)
 {
-	$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_layout_line WHERE fk_layout = ".((int) $layoutId)." ORDER BY position, rowid");
+	$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."financialreporting_layout_line WHERE fk_layout = ".((int) $layoutId)." ORDER BY position, rowid");
 	$pos = 10;
 	$ids = array();
 	while ($resql && ($obj = $db->fetch_object($resql))) {
 		$ids[] = (int) $obj->rowid;
 	}
 	foreach ($ids as $id) {
-		$db->query("UPDATE ".MAIN_DB_PREFIX."anychartlab_layout_line SET position = ".$pos." WHERE rowid = ".$id);
+		$db->query("UPDATE ".MAIN_DB_PREFIX."financialreporting_layout_line SET position = ".$pos." WHERE rowid = ".$id);
 		$pos += 10;
 	}
 }
@@ -235,7 +236,7 @@ function anychartlab_layout_renumber($db, $layoutId)
  *
  * @return array<int,string> rowid => label
  */
-function anychartlab_core_reports($db, $entity)
+function financialreporting_core_reports($db, $entity)
 {
 	$out = array();
 	$resql = $db->query("SELECT rowid, code, label FROM ".MAIN_DB_PREFIX."c_accounting_report WHERE entity IN (0, ".((int) $entity).") AND active = 1 ORDER BY rowid");
@@ -253,14 +254,14 @@ function anychartlab_core_reports($db, $entity)
  *
  * @return int new layout id, <0 on error
  */
-function anychartlab_layout_copy_core($db, $entity, $pcgversion, $reportId, $statement)
+function financialreporting_layout_copy_core($db, $entity, $pcgversion, $reportId, $statement)
 {
 	$resql = $db->query("SELECT code, label FROM ".MAIN_DB_PREFIX."c_accounting_report WHERE rowid = ".((int) $reportId));
 	$rep = ($resql ? $db->fetch_object($resql) : null);
 	if (!$rep) {
 		return -1;
 	}
-	$layoutId = anychartlab_layout_create($db, $entity, 'CORE-'.$rep->code.'-'.$statement, $rep->label.' (copy of personalised report)', $statement, '', 'core', 'c_accounting_report #'.((int) $reportId));
+	$layoutId = financialreporting_layout_create($db, $entity, 'CORE-'.$rep->code.'-'.$statement, $rep->label.' (copy of personalised report)', $statement, '', 'core', 'c_accounting_report #'.((int) $reportId));
 	if ($layoutId < 0) {
 		return -1;
 	}
@@ -274,7 +275,7 @@ function anychartlab_layout_copy_core($db, $entity, $pcgversion, $reportId, $sta
 	$pos = 10;
 	foreach ($cats as $cat) {
 		$isFormula = ((int) $cat->category_type === 1);
-		$lineId = anychartlab_layout_save_line($db, $layoutId, 0, array(
+		$lineId = financialreporting_layout_save_line($db, $layoutId, 0, array(
 			'position' => $pos,
 			'code' => $cat->code,
 			'label' => $cat->label,
@@ -294,7 +295,7 @@ function anychartlab_layout_copy_core($db, $entity, $pcgversion, $reportId, $sta
 		while ($r2 && ($o2 = $db->fetch_object($r2))) {
 			$ids[] = (int) $o2->rowid;
 		}
-		anychartlab_layout_set_explicit($db, $lineId, $ids);
+		financialreporting_layout_set_explicit($db, $lineId, $ids);
 	}
 	return $layoutId;
 }
@@ -304,7 +305,7 @@ function anychartlab_layout_copy_core($db, $entity, $pcgversion, $reportId, $sta
  *
  * @return string[]
  */
-function anychartlab_layout_csv_columns()
+function financialreporting_layout_csv_columns()
 {
 	return array('layout_code', 'layout_label', 'statement', 'country', 'position', 'code', 'label', 'type', 'natures', 'accounts', 'formula', 'sign', 'explicit_accounts');
 }
@@ -315,7 +316,7 @@ function anychartlab_layout_csv_columns()
  * @param string $file
  * @return array<int,array<string,string>>
  */
-function anychartlab_layout_read_csv($file)
+function financialreporting_layout_read_csv($file)
 {
 	$rows = array();
 	$fh = @fopen($file, 'r');
@@ -349,10 +350,10 @@ function anychartlab_layout_read_csv($file)
  *
  * @return array{created:int[],errors:string[]}
  */
-function anychartlab_layout_import($db, $entity, $pcgversion, $rows, $source, $sourceRef)
+function financialreporting_layout_import($db, $entity, $pcgversion, $rows, $source, $sourceRef)
 {
 	$res = array('created' => array(), 'errors' => array());
-	$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+	$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
 	$byCode = array();
 	foreach ($rows as $r) {
 		if (($r['layout_code'] ?? '') === '' || ($r['type'] ?? '') === '') {
@@ -361,18 +362,18 @@ function anychartlab_layout_import($db, $entity, $pcgversion, $rows, $source, $s
 		$byCode[$r['layout_code']][] = $r;
 	}
 	if (!$byCode) {
-		$res['errors'][] = 'No layout lines found. The file needs the columns '.implode(';', anychartlab_layout_csv_columns()).'.';
+		$res['errors'][] = 'No layout lines found. The file needs the columns '.implode(';', financialreporting_layout_csv_columns()).'.';
 		return $res;
 	}
 	foreach ($byCode as $code => $lines) {
 		$first = $lines[0];
-		$layoutId = anychartlab_layout_create($db, $entity, $code, $first['layout_label'] ?? $code, strtoupper($first['statement'] ?? 'BS'), $first['country'] ?? '', $source, $sourceRef);
+		$layoutId = financialreporting_layout_create($db, $entity, $code, $first['layout_label'] ?? $code, strtoupper($first['statement'] ?? 'BS'), $first['country'] ?? '', $source, $sourceRef);
 		if ($layoutId < 0) {
 			$res['errors'][] = 'Could not create layout '.$code.'.';
 			continue;
 		}
 		foreach ($lines as $l) {
-			$lineId = anychartlab_layout_save_line($db, $layoutId, 0, $l);
+			$lineId = financialreporting_layout_save_line($db, $layoutId, 0, $l);
 			if ($lineId > 0 && ($l['explicit_accounts'] ?? '') !== '') {
 				$ids = array();
 				foreach (explode('|', $l['explicit_accounts']) as $num) {
@@ -383,7 +384,7 @@ function anychartlab_layout_import($db, $entity, $pcgversion, $rows, $source, $s
 						$res['errors'][] = 'Account '.trim($num).' (line '.$l['code'].') is not in chart '.$pcgversion.'.';
 					}
 				}
-				anychartlab_layout_set_explicit($db, $lineId, $ids);
+				financialreporting_layout_set_explicit($db, $lineId, $ids);
 			}
 		}
 		$res['created'][] = $layoutId;
@@ -396,7 +397,7 @@ function anychartlab_layout_import($db, $entity, $pcgversion, $rows, $source, $s
  *
  * @return array
  */
-function anychartlab_layout_export_rows($layout, $accounts)
+function financialreporting_layout_export_rows($layout, $accounts)
 {
 	$rows = array();
 	foreach ($layout->lines as $l) {
@@ -416,10 +417,10 @@ function anychartlab_layout_export_rows($layout, $accounts)
  *
  * @return array<string,string> filename => first comment line or filename
  */
-function anychartlab_layout_files()
+function financialreporting_layout_files()
 {
 	$out = array();
-	foreach (glob(anychartlab_seed_dir().'/layouts/*.csv') ?: array() as $f) {
+	foreach (glob(financialreporting_seed_dir().'/layouts/*.csv') ?: array() as $f) {
 		$desc = basename($f);
 		$fh = fopen($f, 'r');
 		$first = $fh ? fgets($fh) : '';
@@ -444,7 +445,7 @@ function anychartlab_layout_files()
  * @param float|null $netdebit null = ignore D/C (static matching)
  * @return bool
  */
-function anychartlab_spec_matches($spec, $number, $netdebit)
+function financialreporting_spec_matches($spec, $number, $netdebit)
 {
 	$items = preg_split('/[,|; ]+/', (string) $spec, -1, PREG_SPLIT_NO_EMPTY);
 	$hasInclude = false;
@@ -481,7 +482,7 @@ function anychartlab_spec_matches($spec, $number, $netdebit)
  * @param float|null $netdebit
  * @return bool
  */
-function anychartlab_line_rule_matches($line, $nature, $number, $netdebit)
+function financialreporting_line_rule_matches($line, $nature, $number, $netdebit)
 {
 	if ((string) $line->natures === '' && (string) $line->accounts === '') {
 		return false;	// only explicit accounts
@@ -489,7 +490,7 @@ function anychartlab_line_rule_matches($line, $nature, $number, $netdebit)
 	if ((string) $line->natures !== '' && !in_array($nature, explode('|', $line->natures))) {
 		return false;
 	}
-	return anychartlab_spec_matches((string) $line->accounts, $number, $netdebit);
+	return financialreporting_spec_matches((string) $line->accounts, $number, $netdebit);
 }
 
 /**
@@ -500,11 +501,11 @@ function anychartlab_line_rule_matches($line, $nature, $number, $netdebit)
  * @param string[]             $errors  Unknown codes are added here
  * @return float
  */
-function anychartlab_formula_eval($formula, $values, &$errors)
+function financialreporting_formula_eval($formula, $values, &$errors)
 {
 	preg_match_all('/\s*([A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?|[-+*\/()])/', (string) $formula, $m);
 	$st = array('t' => $m[1], 'p' => 0);
-	return (float) anychartlab_fx_expr($st, $values, $errors);
+	return (float) financialreporting_fx_expr($st, $values, $errors);
 }
 
 /**
@@ -512,12 +513,12 @@ function anychartlab_formula_eval($formula, $values, &$errors)
  *
  * @return float
  */
-function anychartlab_fx_expr(&$st, $values, &$errors)
+function financialreporting_fx_expr(&$st, $values, &$errors)
 {
-	$v = anychartlab_fx_term($st, $values, $errors);
+	$v = financialreporting_fx_term($st, $values, $errors);
 	while (in_array($st['t'][$st['p']] ?? null, array('+', '-'), true)) {
 		$op = $st['t'][$st['p']++];
-		$r = anychartlab_fx_term($st, $values, $errors);
+		$r = financialreporting_fx_term($st, $values, $errors);
 		$v = ($op === '+' ? $v + $r : $v - $r);
 	}
 	return $v;
@@ -528,12 +529,12 @@ function anychartlab_fx_expr(&$st, $values, &$errors)
  *
  * @return float
  */
-function anychartlab_fx_term(&$st, $values, &$errors)
+function financialreporting_fx_term(&$st, $values, &$errors)
 {
-	$v = anychartlab_fx_factor($st, $values, $errors);
+	$v = financialreporting_fx_factor($st, $values, $errors);
 	while (in_array($st['t'][$st['p']] ?? null, array('*', '/'), true)) {
 		$op = $st['t'][$st['p']++];
-		$r = anychartlab_fx_factor($st, $values, $errors);
+		$r = financialreporting_fx_factor($st, $values, $errors);
 		$v = ($op === '*' ? $v * $r : ($r != 0 ? $v / $r : 0.0));
 	}
 	return $v;
@@ -544,17 +545,17 @@ function anychartlab_fx_term(&$st, $values, &$errors)
  *
  * @return float
  */
-function anychartlab_fx_factor(&$st, $values, &$errors)
+function financialreporting_fx_factor(&$st, $values, &$errors)
 {
 	$t = $st['t'][$st['p']++] ?? null;
 	if ($t === null) {
 		return 0.0;
 	}
 	if ($t === '-') {
-		return -anychartlab_fx_factor($st, $values, $errors);
+		return -financialreporting_fx_factor($st, $values, $errors);
 	}
 	if ($t === '(') {
-		$v = anychartlab_fx_expr($st, $values, $errors);
+		$v = financialreporting_fx_expr($st, $values, $errors);
 		$st['p']++;	// closing parenthesis
 		return $v;
 	}
@@ -572,12 +573,12 @@ function anychartlab_fx_factor(&$st, $values, &$errors)
 /**
  * Lay out statement lines.
  *
- * @param object $layout From anychartlab_layout_fetch()
+ * @param object $layout From financialreporting_layout_fetch()
  * @param array  $lines  Statement lines: array('acc','amount','note','netdebit','section')
  * @param array  $extra  Built-in values usable in formulas, e.g. array('RESULT' => 123.45)
  * @return array{rows:array,unmatched:array,values:array,errors:string[]}
  */
-function anychartlab_apply_layout($layout, $lines, $extra)
+function financialreporting_apply_layout($layout, $lines, $extra)
 {
 	$res = array('rows' => array(), 'unmatched' => array(), 'values' => array(), 'errors' => array());
 	$taken = array();	// line index => layout line rowid
@@ -592,7 +593,7 @@ function anychartlab_apply_layout($layout, $lines, $extra)
 			continue;
 		}
 		foreach ($layout->lines as $ll) {
-			if ($ll->type === 'group' && anychartlab_line_rule_matches($ll, $l['section'], $l['acc']->account_number, $l['netdebit'])) {
+			if ($ll->type === 'group' && financialreporting_line_rule_matches($ll, $l['section'], $l['acc']->account_number, $l['netdebit'])) {
 				$taken[$i] = (int) $ll->rowid;
 				break;
 			}
@@ -627,7 +628,7 @@ function anychartlab_apply_layout($layout, $lines, $extra)
 			$values[strtoupper($ll->code)] = $total;
 		} elseif ($ll->type === 'formula') {
 			$errs = array();
-			$row['total'] = anychartlab_formula_eval($ll->formula, $values, $errs);
+			$row['total'] = financialreporting_formula_eval($ll->formula, $values, $errs);
 			foreach ($errs as $e) {
 				$res['errors'][] = 'Line '.$ll->code.': unknown code "'.$e.'" in formula (codes must be defined on an earlier line'.(isset($extra['RESULT']) ? '; RESULT is the result of unclosed periods' : '').').';
 			}
@@ -644,7 +645,7 @@ function anychartlab_apply_layout($layout, $lines, $extra)
  *
  * @return void
  */
-function anychartlab_print_layout($result, $accounts, $view, $showDraft, $entries, $hidden = array())
+function financialreporting_print_layout($result, $accounts, $view, $showDraft, $entries, $hidden = array())
 {
 	$cols = ($showDraft ? 4 : 3);
 	foreach ($result['rows'] as $row) {
@@ -653,24 +654,24 @@ function anychartlab_print_layout($result, $accounts, $view, $showDraft, $entrie
 			continue;
 		}
 		if ($ll->type === 'heading') {
-			print '<tr class="liste_titre acl-section"><th colspan="'.($cols + 1).'">'.dol_escape_htmltag($ll->label).'</th></tr>';
+			print '<tr class="liste_titre fr-section"><th colspan="'.($cols + 1).'">'.dol_escape_htmltag($ll->label).'</th></tr>';
 			continue;
 		}
 		if ($ll->type === 'formula') {
-			print '<tr class="liste_total acl-grandtotal"><td colspan="'.$cols.'">'.dol_escape_htmltag($ll->label).' <span class="opacitymedium" style="font-weight:normal">= '.dol_escape_htmltag((string) $ll->formula).'</span></td><td class="right amount">'.anychartlab_price($row['total']).'</td></tr>';
+			print '<tr class="liste_total fr-grandtotal"><td colspan="'.$cols.'">'.dol_escape_htmltag($ll->label).' <span class="opacitymedium" style="font-weight:normal">= '.dol_escape_htmltag((string) $ll->formula).'</span></td><td class="right amount">'.financialreporting_price($row['total']).'</td></tr>';
 			continue;
 		}
 		if ($view === 'summary') {
-			print '<tr class="oddeven acl-account"><td colspan="'.$cols.'">'.dol_escape_htmltag($ll->label).' <span class="opacitymedium">('.count($row['lines']).' account'.(count($row['lines']) === 1 ? '' : 's').')</span></td><td class="right amount">'.anychartlab_price($row['total']).'</td></tr>';
+			print '<tr class="oddeven fr-account"><td colspan="'.$cols.'">'.dol_escape_htmltag($ll->label).' <span class="opacitymedium">('.count($row['lines']).' account'.(count($row['lines']) === 1 ? '' : 's').')</span></td><td class="right amount">'.financialreporting_price($row['total']).'</td></tr>';
 			continue;
 		}
-		print '<tr class="oddeven acl-heading"><td colspan="'.($cols + 1).'">'.dol_escape_htmltag($ll->label).'</td></tr>';
+		print '<tr class="oddeven fr-heading"><td colspan="'.($cols + 1).'">'.dol_escape_htmltag($ll->label).'</td></tr>';
 		if ($row['lines']) {
-			anychartlab_print_groups(anychartlab_group_lines($row['lines'], $accounts), 'detailed', $showDraft, $entries, '');
+			financialreporting_print_groups(financialreporting_group_lines($row['lines'], $accounts), 'detailed', $showDraft, $entries, '');
 		} else {
 			print '<tr class="oddeven"><td></td><td colspan="'.($cols).'" class="opacitymedium">No account with a balance.</td></tr>';
 		}
-		print '<tr class="oddeven acl-total"><td></td><td colspan="'.($cols - 1).'" class="right">Total '.dol_escape_htmltag($ll->label).'</td><td class="right amount">'.anychartlab_price($row['total']).'</td></tr>';
+		print '<tr class="oddeven fr-total"><td></td><td colspan="'.($cols - 1).'" class="right">Total '.dol_escape_htmltag($ll->label).'</td><td class="right amount">'.financialreporting_price($row['total']).'</td></tr>';
 	}
 }
 
@@ -679,7 +680,7 @@ function anychartlab_print_layout($result, $accounts, $view, $showDraft, $entrie
  *
  * @return array
  */
-function anychartlab_layout_csv($result, $accounts, $view, $entries, $hidden = array())
+function financialreporting_layout_csv($result, $accounts, $view, $entries, $hidden = array())
 {
 	$rows = array();
 	foreach ($result['rows'] as $row) {
@@ -688,15 +689,15 @@ function anychartlab_layout_csv($result, $accounts, $view, $entries, $hidden = a
 			continue;
 		}
 		if ($ll->type === 'heading') {
-			$rows[] = anychartlab_r(array($ll->label, '', '', '', ''), 'section');
+			$rows[] = financialreporting_r(array($ll->label, '', '', '', ''), 'section');
 		} elseif ($ll->type === 'formula') {
-			$rows[] = anychartlab_r(array('', $ll->label, '', '', price2num($row['total'], 'MT')), 'grandtotal');
+			$rows[] = financialreporting_r(array('', $ll->label, '', '', price2num($row['total'], 'MT')), 'grandtotal');
 		} elseif ($view === 'summary') {
-			$rows[] = anychartlab_r(array('', $ll->label, '', '', price2num($row['total'], 'MT')), 'account');
+			$rows[] = financialreporting_r(array('', $ll->label, '', '', price2num($row['total'], 'MT')), 'account');
 		} else {
-			$rows[] = anychartlab_r(array('', $ll->label, '', '', ''), 'heading');
-			$rows = array_merge($rows, anychartlab_groups_csv(anychartlab_group_lines($row['lines'], $accounts), 'detailed', $entries, ''));
-			$rows[] = anychartlab_r(array('', 'Total '.$ll->label, '', '', price2num($row['total'], 'MT')), 'total');
+			$rows[] = financialreporting_r(array('', $ll->label, '', '', ''), 'heading');
+			$rows = array_merge($rows, financialreporting_groups_csv(financialreporting_group_lines($row['lines'], $accounts), 'detailed', $entries, ''));
+			$rows[] = financialreporting_r(array('', 'Total '.$ll->label, '', '', price2num($row['total'], 'MT')), 'total');
 		}
 	}
 	return $rows;
@@ -707,10 +708,10 @@ function anychartlab_layout_csv($result, $accounts, $view, $entries, $hidden = a
  * formulas that are zero because everything they refer to is hidden, and headings
  * with no visible group below them (until the next heading).
  *
- * @param array $result From anychartlab_apply_layout()
+ * @param array $result From financialreporting_apply_layout()
  * @return array<int,bool> layout line rowid => true
  */
-function anychartlab_layout_hidden($result)
+function financialreporting_layout_hidden($result)
 {
 	$hidden = array();
 	$hiddenCodes = array();
@@ -753,7 +754,7 @@ function anychartlab_layout_hidden($result)
  *
  * @return void
  */
-function anychartlab_print_unmatched($result, $statementLabel)
+function financialreporting_print_unmatched($result, $statementLabel)
 {
 	if (!$result['unmatched']) {
 		return;
@@ -763,9 +764,9 @@ function anychartlab_print_unmatched($result, $statementLabel)
 	print '<table class="noborder centpercent"><tr class="liste_titre"><th>Account</th><th>Label</th><th>Placed as</th><th class="right">Amount</th></tr>';
 	foreach ($result['unmatched'] as $l) {
 		$sum += $l['amount'];
-		print '<tr class="oddeven"><td><a href="'.anychartlab_ledger_url($l['acc']->account_number).'" target="_blank">'.dol_escape_htmltag($l['acc']->account_number).'</a></td><td>'.dol_escape_htmltag($l['acc']->label).'</td><td>'.dol_escape_htmltag($l['section']).'</td><td class="right amount">'.anychartlab_price($l['amount']).'</td></tr>';
+		print '<tr class="oddeven"><td><a href="'.financialreporting_ledger_url($l['acc']->account_number).'" target="_blank">'.dol_escape_htmltag($l['acc']->account_number).'</a></td><td>'.dol_escape_htmltag($l['acc']->label).'</td><td>'.dol_escape_htmltag($l['section']).'</td><td class="right amount">'.financialreporting_price($l['amount']).'</td></tr>';
 	}
-	print '<tr class="liste_total"><td colspan="3">Not in layout</td><td class="right amount">'.anychartlab_price($sum).'</td></tr></table>';
+	print '<tr class="liste_total"><td colspan="3">Not in layout</td><td class="right amount">'.financialreporting_price($sum).'</td></tr></table>';
 }
 
 /**
@@ -775,7 +776,7 @@ function anychartlab_print_unmatched($result, $statementLabel)
  *
  * @return array{counts:array<int,int>,unmatched:object[],dupcodes:string[]}
  */
-function anychartlab_layout_static_check($layout, $accounts)
+function financialreporting_layout_static_check($layout, $accounts)
 {
 	$natures = ($layout->statement === 'IS' ? array('INCOME', 'EXPENSE') : array('ASSET', 'LIABILITY', 'EQUITY', 'CLEARING'));
 	$counts = array();
@@ -798,7 +799,7 @@ function anychartlab_layout_static_check($layout, $accounts)
 		if (!$hit) {
 			foreach ($layout->lines as $ll) {
 				foreach ($cands as $nat) {
-					if ($ll->type === 'group' && anychartlab_line_rule_matches($ll, $nat === 'CLEARING' ? 'ASSET' : $nat, $acc->account_number, null)) {
+					if ($ll->type === 'group' && financialreporting_line_rule_matches($ll, $nat === 'CLEARING' ? 'ASSET' : $nat, $acc->account_number, null)) {
 						$hit = (int) $ll->rowid;
 						break 2;
 					}

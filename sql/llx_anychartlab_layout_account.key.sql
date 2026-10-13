@@ -1,1 +1,0 @@
-ALTER TABLE llx_anychartlab_layout_account ADD UNIQUE INDEX uk_anychartlab_layout_account (fk_layout_line, fk_accounting_account);

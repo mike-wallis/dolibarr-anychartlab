@@ -1,5 +1,5 @@
--- Any-Chart Reports Lab (prototype): statement layouts (own copy, core personalised groups are only read).
-CREATE TABLE llx_anychartlab_layout (
+-- Financial Reporting: statement layouts (own copy, core personalised groups are only read).
+CREATE TABLE llx_financialreporting_layout (
   rowid         integer AUTO_INCREMENT PRIMARY KEY,
   entity        integer DEFAULT 1 NOT NULL,
   code          varchar(32) NOT NULL,

@@ -1,0 +1,21 @@
+# label: Australia (AASB; many small proprietary companies prepare special purpose reports)
+# review: unreviewed
+# notes: General purpose reports follow AASB 101 (IFRS-based): current / non-current split, expenses by nature or function. Special purpose reports (common for small proprietary companies) have no mandatory layout, but accountants usually present a multi-step profit and loss with gross profit, and a balance sheet split into current and non-current. Amounts exclude GST.
+class;heading;required;note
+NONCURRENT_ASSET;Non-current assets (property, plant and equipment, motor vehicles, intangibles);yes;
+CURRENT_ASSET;Current assets (trade and other receivables, inventories, prepayments);yes;
+CASH;Cash and cash equivalents;yes;
+NONCURRENT_LIABILITY;Non-current liabilities (borrowings, long service leave provision);yes;
+CURRENT_LIABILITY;Current liabilities (trade and other payables, GST, PAYG withholding, employee entitlements, current tax);yes;
+EQUITY;Equity (issued capital, retained earnings);yes;
+REVENUE;Revenue;yes;
+OTHER_OPERATING_INCOME;Other income;no;
+FINANCIAL_INCOME;Interest income / finance income;no;Often shown within other income
+NONRECURRING_INCOME;(not a separate heading);no;
+COST_OF_SALES;Cost of sales;no;Gives the gross profit line, usual in special purpose reports
+EMPLOYEE_COST;Employee benefits expense (wages, superannuation);yes;On the face (by nature) or in the notes (by function)
+DEPRECIATION;Depreciation and amortisation;yes;
+OPERATING_EXPENSE;Other expenses (occupancy, administration, marketing, motor vehicle...);no;
+FINANCE_COST;Finance costs;yes;
+NONRECURRING_EXPENSE;(not a separate heading);no;
+INCOME_TAX;Income tax expense;yes;

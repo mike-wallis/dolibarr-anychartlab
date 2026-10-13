@@ -1,0 +1,20 @@
+# Financial Reporting wizard template. Lines starting with "# key: value" describe the template.
+# label: Income Statement (generic: income less expenses)
+# statement: IS
+# review: generic
+# section INCOME: Income
+# section EXPENSES: Expenses
+# Columns: section;section_type;code;label;type;natures;accounts;formula;sign
+#   section       code of the wizard step the line belongs to (formula lines: the step they close)
+#   section_type  INCOME or EXPENSE: sets the default natures taken and the sign (shown positive)
+#   type          group (takes accounts) or formula (codes of earlier lines with + - * / ( ))
+#   natures       optional: natures the group takes, if not just the section type (e.g. INCOME|EXPENSE)
+#   accounts      account number prefixes: 70,71 = starts with; !7091 = never; empty = catch-all for the rest of its natures
+#                 An account goes to the group with the longest matching prefix; catch-alls only take what is left.
+#   sign          optional: cd (credit - debit) or dc (debit - credit); empty = from the section type
+# Each wizard step is named by a header line "section <code>: <label>" (one per section, in order).
+# Codes: at most 16 characters (Dolibarr's limit), letters, digits and _.
+section;section_type;code;label;type;natures;accounts;formula;sign
+INCOME;INCOME;INCOME;Income;group;;;;
+EXPENSES;EXPENSE;EXPENSES;Expenses;group;;;;
+EXPENSES;;NET;Net result;formula;;;INCOME-EXPENSES;

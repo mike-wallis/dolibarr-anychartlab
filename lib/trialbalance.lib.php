@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — Trial Balance.
+ * Financial Reporting — Trial Balance.
  *
  * Every account with a balance or a movement: opening balance, debits and credits of
  * the period, closing balance. Entries are taken from the same window as the Balance
@@ -19,7 +19,7 @@
  * @param int      $to
  * @return array<string,array{0:float,1:float}> account number => [debit, credit]
  */
-function anychartlab_tb_movements($db, $entity, $from, $to)
+function financialreporting_tb_movements($db, $entity, $from, $to)
 {
 	$out = array();
 	$sql = "SELECT numero_compte, SUM(debit) as debit, SUM(credit) as credit";
@@ -46,21 +46,21 @@ function anychartlab_tb_movements($db, $entity, $from, $to)
  *
  * @param DoliDB $db
  * @param int    $entity
- * @param array  $accounts From anychartlab_load_accounts()
+ * @param array  $accounts From financialreporting_load_accounts()
  * @param int    $from
  * @param int    $to
  * @return array{lines:array,totals:array,window:array,movementFrom:int,cut:bool}
  */
-function anychartlab_tb_build($db, $entity, $accounts, $from, $to)
+function financialreporting_tb_build($db, $entity, $accounts, $from, $to)
 {
-	$window = anychartlab_window_start($db, $entity, $to);
+	$window = financialreporting_window_start($db, $entity, $to);
 	$start = $window['start'];
 	// A closure inside the period: movements before the window start are already in the
 	// opening entries the closure posted, so the period's movements start at the window.
 	$cut = ($start !== null && $start > $from);
 	$movementFrom = ($cut ? $start : $from);
-	$opening = ($cut ? array() : anychartlab_tb_movements($db, $entity, $start, $movementFrom - 1));
-	$moves = anychartlab_tb_movements($db, $entity, $movementFrom, $to);
+	$opening = ($cut ? array() : financialreporting_tb_movements($db, $entity, $start, $movementFrom - 1));
+	$moves = financialreporting_tb_movements($db, $entity, $movementFrom, $to);
 
 	$lines = array();
 	$totals = array('opening' => 0.0, 'debit' => 0.0, 'credit' => 0.0, 'closing_dr' => 0.0, 'closing_cr' => 0.0);
@@ -78,7 +78,7 @@ function anychartlab_tb_build($db, $entity, $accounts, $from, $to)
 			$group = 'UNKNOWN';
 			$note = 'not in the active chart';
 		} else {
-			$eff = anychartlab_effective_nature($acc, $closing);
+			$eff = financialreporting_effective_nature($acc, $closing);
 			$group = ($eff === null ? 'UNCLASSIFIED' : $eff);
 			$note = ($eff === null ? 'unclassified' : ($eff !== $acc->nature ? 'shown as '.strtolower($eff).' (balance on the other side)' : ($acc->contra ? 'contra' : '')));
 		}
@@ -102,7 +102,7 @@ function anychartlab_tb_build($db, $entity, $accounts, $from, $to)
  *
  * @return array<string,string>
  */
-function anychartlab_tb_groups()
+function financialreporting_tb_groups()
 {
 	return array(
 		'ASSET' => 'Assets', 'LIABILITY' => 'Liabilities', 'EQUITY' => 'Equity',
@@ -115,14 +115,14 @@ function anychartlab_tb_groups()
  * Report rows: kind + cells (account, label, nature, note, opening, debit, credit, closing debit, closing credit).
  * Amount cells are floats, or '' when there is nothing to show.
  *
- * @param array  $tb      From anychartlab_tb_build()
+ * @param array  $tb      From financialreporting_tb_build()
  * @param string $groupBy none or nature
  * @return array
  */
-function anychartlab_tb_rows($tb, $groupBy)
+function financialreporting_tb_rows($tb, $groupBy)
 {
 	$line = function ($l) {
-		return anychartlab_r(array(
+		return financialreporting_r(array(
 			$l['number'], $l['label'], ($l['group'] === 'UNKNOWN' || $l['group'] === 'UNCLASSIFIED' ? '' : $l['group']), $l['note'],
 			$l['opening'], $l['debit'], $l['credit'], ($l['closing'] >= 0 ? $l['closing'] : ''), ($l['closing'] < 0 ? -$l['closing'] : ''),
 		), 'account');
@@ -139,20 +139,20 @@ function anychartlab_tb_rows($tb, $groupBy)
 	};
 	$rows = array();
 	if ($groupBy === 'nature') {
-		foreach (anychartlab_tb_groups() as $code => $title) {
+		foreach (financialreporting_tb_groups() as $code => $title) {
 			$lines = array_values(array_filter($tb['lines'], function ($l) use ($code) {
 				return $l['group'] === $code;
 			}));
 			if (!$lines) {
 				continue;
 			}
-			$rows[] = anychartlab_r(array($title, '', '', '', '', '', '', '', ''), 'section');
+			$rows[] = financialreporting_r(array($title, '', '', '', '', '', '', '', ''), 'section');
 			foreach ($lines as $l) {
 				$rows[] = $line($l);
 			}
 			$t = $sum($lines);
 			$net = $t[3] - $t[4];
-			$rows[] = anychartlab_r(array('', 'Total '.strtolower($title), '', '', $t[0], $t[1], $t[2], ($net >= 0 ? $net : ''), ($net < 0 ? -$net : '')), 'total');
+			$rows[] = financialreporting_r(array('', 'Total '.strtolower($title), '', '', $t[0], $t[1], $t[2], ($net >= 0 ? $net : ''), ($net < 0 ? -$net : '')), 'total');
 		}
 	} else {
 		foreach ($tb['lines'] as $l) {
@@ -160,6 +160,6 @@ function anychartlab_tb_rows($tb, $groupBy)
 		}
 	}
 	$t = $tb['totals'];
-	$rows[] = anychartlab_r(array('', 'Total', '', '', $t['opening'], $t['debit'], $t['credit'], $t['closing_dr'], $t['closing_cr']), 'grandtotal');
+	$rows[] = financialreporting_r(array('', 'Total', '', '', $t['opening'], $t['debit'], $t['credit'], $t['closing_dr'], $t['closing_cr']), 'grandtotal');
 	return $rows;
 }

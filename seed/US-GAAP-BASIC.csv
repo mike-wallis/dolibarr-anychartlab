@@ -1,4 +1,4 @@
-# Any-Chart Reports Lab: rules for US-GAAP-BASIC. Most specific first; first match wins.
+# Financial Reporting: rules for US-GAAP-BASIC. Most specific first; first match wins.
 # Columns: pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
 pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
 EQUITY;343;;EQUITY;;1;Treasury stock: contra-equity

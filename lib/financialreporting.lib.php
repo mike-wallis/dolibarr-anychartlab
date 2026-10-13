@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — shared functions.
+ * Financial Reporting — shared functions.
  *
  * Everything that knows about natures lives here, so the pages stay thin and the
  * logic can later be lifted into core (htdocs/accountancy/) in one piece.
@@ -16,10 +16,25 @@
  * presentation amount only when placed on a statement side.
  */
 
+require_once __DIR__.'/classes.lib.php';
+require_once __DIR__.'/rules.lib.php';
+
 /**
  * @return array<string,string> nature code => label, in display order
  */
-function anychartlab_natures()
+function financialreporting_natures()
+{
+	$labels = financialreporting_structure()['types'];	// the user's labels for the fixed types
+	return array_merge(financialreporting_natures_default(), $labels ? array_intersect_key($labels, financialreporting_natures_default()) : array());
+}
+
+/**
+ * The fixed account types with their default labels. Types can be renamed, never added:
+ * the statements are built on them (assets = liabilities + equity, result = income - expenses).
+ *
+ * @return array<string,string>
+ */
+function financialreporting_natures_default()
 {
 	return array(
 		'ASSET'     => 'Asset',
@@ -38,7 +53,7 @@ function anychartlab_natures()
  * @param string|null $nature
  * @return string
  */
-function anychartlab_normal_side($nature)
+function financialreporting_normal_side($nature)
 {
 	if (in_array($nature, array('ASSET', 'EXPENSE', 'CLEARING'))) {
 		return 'D';
@@ -53,7 +68,7 @@ function anychartlab_normal_side($nature)
  * @param string|null $nature
  * @return bool True for natures reported on the income statement
  */
-function anychartlab_is_pl($nature)
+function financialreporting_is_pl($nature)
 {
 	return in_array($nature, array('INCOME', 'EXPENSE'));
 }
@@ -64,7 +79,7 @@ function anychartlab_is_pl($nature)
  * @param DoliDB $db
  * @return string '' if none selected
  */
-function anychartlab_active_chart($db)
+function financialreporting_active_chart($db)
 {
 	$sql = "SELECT pcg_version FROM ".MAIN_DB_PREFIX."accounting_system WHERE rowid = ".((int) getDolGlobalInt('CHARTOFACCOUNTS'));
 	$resql = $db->query($sql);
@@ -82,14 +97,14 @@ function anychartlab_active_chart($db)
  * @param string $pcgversion
  * @return array{byRowid: array<int,object>, byNumber: array<string,object>}
  */
-function anychartlab_load_accounts($db, $entity, $pcgversion)
+function financialreporting_load_accounts($db, $entity, $pcgversion)
 {
 	$byRowid = array();
 	$byNumber = array();
 	$sql = "SELECT a.rowid, a.account_number, a.label, a.pcg_type, a.account_parent, a.active,";
-	$sql .= " n.nature, n.nature_alt, n.contra, n.source, n.cf_class";
+	$sql .= " n.nature, n.nature_alt, n.contra, n.source, n.cf_class, n.class, n.class_source";
 	$sql .= " FROM ".MAIN_DB_PREFIX."accounting_account as a";
-	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."anychartlab_nature as n ON n.fk_accounting_account = a.rowid AND n.entity = ".((int) $entity);
+	$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."financialreporting_account_nature as n ON n.fk_accounting_account = a.rowid AND n.entity = ".((int) $entity);
 	$sql .= " WHERE a.entity = ".((int) $entity);
 	$sql .= " AND a.fk_pcg_version = '".$db->escape($pcgversion)."'";
 	$sql .= " ORDER BY a.account_number";
@@ -101,6 +116,7 @@ function anychartlab_load_accounts($db, $entity, $pcgversion)
 			$obj->nature_alt = ($obj->nature_alt === '' ? null : $obj->nature_alt);
 			$obj->contra = (int) $obj->contra;
 			$obj->cf_class = ($obj->cf_class === '' ? null : $obj->cf_class);
+			$obj->class = ($obj->class === '' ? null : $obj->class);
 			$byRowid[(int) $obj->rowid] = $obj;
 			$byNumber[$obj->account_number] = $obj;
 		}
@@ -123,13 +139,13 @@ function anychartlab_load_accounts($db, $entity, $pcgversion)
  * @param string      $source     chart, generic, parent, manual, import
  * @return int <0 on error
  */
-function anychartlab_save_nature($db, $user, $entity, $accountid, $nature, $natureAlt, $contra, $source)
+function financialreporting_save_nature($db, $user, $entity, $accountid, $nature, $natureAlt, $contra, $source)
 {
-	$natures = anychartlab_natures();
+	$natures = financialreporting_natures();
 	$nature = (isset($natures[(string) $nature]) ? $nature : null);
 	$natureAlt = (isset($natures[(string) $natureAlt]) && $natureAlt !== $nature ? $natureAlt : null);
 
-	$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_nature WHERE entity = ".((int) $entity)." AND fk_accounting_account = ".((int) $accountid);
+	$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."financialreporting_account_nature WHERE entity = ".((int) $entity)." AND fk_accounting_account = ".((int) $accountid);
 	$resql = $db->query($sql);
 	if (!$resql) {
 		return -1;
@@ -141,9 +157,9 @@ function anychartlab_save_nature($db, $user, $entity, $accountid, $nature, $natu
 	$values .= ", source = '".$db->escape($source)."'";
 	$values .= ", fk_user_modif = ".((int) $user->id);
 	if ($obj) {
-		$sql = "UPDATE ".MAIN_DB_PREFIX."anychartlab_nature SET ".$values." WHERE rowid = ".((int) $obj->rowid);
+		$sql = "UPDATE ".MAIN_DB_PREFIX."financialreporting_account_nature SET ".$values." WHERE rowid = ".((int) $obj->rowid);
 	} else {
-		$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_nature (entity, fk_accounting_account, nature, nature_alt, contra, source, fk_user_modif) VALUES (";
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."financialreporting_account_nature (entity, fk_accounting_account, nature, nature_alt, contra, source, fk_user_modif) VALUES (";
 		$sql .= ((int) $entity).", ".((int) $accountid).", ".($nature ? "'".$db->escape($nature)."'" : "NULL").", ".($natureAlt ? "'".$db->escape($natureAlt)."'" : "NULL");
 		$sql .= ", ".($contra ? 1 : 0).", '".$db->escape($source)."', ".((int) $user->id).")";
 	}
@@ -160,10 +176,10 @@ function anychartlab_save_nature($db, $user, $entity, $accountid, $nature, $natu
  * @param string|null $class
  * @return int <0 on error
  */
-function anychartlab_save_cf_class($db, $user, $entity, $accountid, $class)
+function financialreporting_save_cf_class($db, $user, $entity, $accountid, $class)
 {
 	$class = (in_array((string) $class, array('CASH', 'OPERATING', 'INVESTING', 'FINANCING'), true) ? $class : null);
-	$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."anychartlab_nature WHERE entity = ".((int) $entity)." AND fk_accounting_account = ".((int) $accountid);
+	$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."financialreporting_account_nature WHERE entity = ".((int) $entity)." AND fk_accounting_account = ".((int) $accountid);
 	$resql = $db->query($sql);
 	if (!$resql) {
 		return -1;
@@ -171,9 +187,9 @@ function anychartlab_save_cf_class($db, $user, $entity, $accountid, $class)
 	$obj = $db->fetch_object($resql);
 	$value = ($class ? "'".$db->escape($class)."'" : "NULL");
 	if ($obj) {
-		$sql = "UPDATE ".MAIN_DB_PREFIX."anychartlab_nature SET cf_class = ".$value.", fk_user_modif = ".((int) $user->id)." WHERE rowid = ".((int) $obj->rowid);
+		$sql = "UPDATE ".MAIN_DB_PREFIX."financialreporting_account_nature SET cf_class = ".$value.", fk_user_modif = ".((int) $user->id)." WHERE rowid = ".((int) $obj->rowid);
 	} else {
-		$sql = "INSERT INTO ".MAIN_DB_PREFIX."anychartlab_nature (entity, fk_accounting_account, contra, source, cf_class, fk_user_modif) VALUES (";
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."financialreporting_account_nature (entity, fk_accounting_account, contra, source, cf_class, fk_user_modif) VALUES (";
 		$sql .= ((int) $entity).", ".((int) $accountid).", 0, 'manual', ".$value.", ".((int) $user->id).")";
 	}
 	return $db->query($sql) ? 1 : -1;
@@ -187,9 +203,9 @@ function anychartlab_save_cf_class($db, $user, $entity, $accountid, $class)
  * @param string $pcgversion
  * @return int Number of rows deleted, <0 on error
  */
-function anychartlab_reset($db, $entity, $pcgversion)
+function financialreporting_reset($db, $entity, $pcgversion)
 {
-	$sql = "DELETE FROM ".MAIN_DB_PREFIX."anychartlab_nature WHERE entity = ".((int) $entity);
+	$sql = "DELETE FROM ".MAIN_DB_PREFIX."financialreporting_account_nature WHERE entity = ".((int) $entity);
 	$sql .= " AND fk_accounting_account IN (SELECT rowid FROM ".MAIN_DB_PREFIX."accounting_account WHERE entity = ".((int) $entity)." AND fk_pcg_version = '".$db->escape($pcgversion)."')";
 	$resql = $db->query($sql);
 	return $resql ? $db->affected_rows($resql) : -1;
@@ -200,7 +216,7 @@ function anychartlab_reset($db, $entity, $pcgversion)
  *
  * @return string
  */
-function anychartlab_seed_dir()
+function financialreporting_seed_dir()
 {
 	return dirname(__DIR__).'/seed';
 }
@@ -213,7 +229,7 @@ function anychartlab_seed_dir()
  * @param string $file
  * @return array<int,array<string,string>> Rules in file order (first match wins)
  */
-function anychartlab_load_rules($file)
+function financialreporting_load_rules($file)
 {
 	$rules = array();
 	if (!is_readable($file)) {
@@ -248,7 +264,7 @@ function anychartlab_load_rules($file)
  * @param object               $account
  * @return bool
  */
-function anychartlab_rule_matches($rule, $account)
+function financialreporting_rule_matches($rule, $account)
 {
 	if (($rule['pcg_type'] ?? '') !== '') {
 		$ok = false;
@@ -291,6 +307,8 @@ function anychartlab_rule_matches($rule, $account)
 /**
  * "Apply default natures": classify every still-unclassified account of the chart,
  * in three steps, never overwriting a nature already set:
+ *   0. accounts Dolibarr's setup uses for clearing (bank transfer, suspense)  source 'dolibarr'
+ *   0b. the user's own rules (Setup > Rule sets)       source 'user'
  *   1. the chart's own rules  (seed/<pcg_version>.csv)   source 'chart'
  *   2. the generic rules       (seed/generic.csv)         source 'generic'
  *   3. inherit from the parent account                    source 'parent'
@@ -300,22 +318,33 @@ function anychartlab_rule_matches($rule, $account)
  * @param int    $entity
  * @param string $pcgversion
  * @param  string|null $ruleFile Rule file in seed/ for step 1; null = suggested one, '' = none (generic rules only)
- * @return array{chart:int,generic:int,parent:int,remaining:int,chartfile:string}
+ * @return array{dolibarr:int,user:int,chart:int,generic:int,parent:int,remaining:int,chartfile:string}
  */
-function anychartlab_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile = null)
+function financialreporting_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile = null)
 {
-	$counts = array('chart' => 0, 'generic' => 0, 'parent' => 0, 'remaining' => 0, 'chartfile' => '');
-	$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
+	$counts = array('dolibarr' => 0, 'user' => 0, 'chart' => 0, 'generic' => 0, 'parent' => 0, 'remaining' => 0, 'chartfile' => '');
+	$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
+
+	// Step 0: accounts Dolibarr's own setup uses for clearing (any chart, any country)
+	foreach (financialreporting_dolibarr_clearing_accounts() as $number => $why) {
+		$acc = $accounts['byNumber'][$number] ?? null;
+		if ($acc && $acc->nature === null) {
+			$acc->nature = 'CLEARING';
+			financialreporting_save_nature($db, $user, $entity, (int) $acc->rowid, 'CLEARING', null, 0, 'dolibarr');
+			$counts['dolibarr']++;
+		}
+	}
 
 	if ($ruleFile === null) {
-		$sug = anychartlab_suggest_ruleset($pcgversion);
+		$sug = financialreporting_suggest_ruleset($pcgversion);
 		$ruleFile = ($sug ? $sug['file'] : '');
 	}
-	$chartfile = ($ruleFile !== '' ? anychartlab_seed_dir().'/'.basename($ruleFile) : '');
+	$chartfile = ($ruleFile !== '' ? financialreporting_seed_dir().'/'.basename($ruleFile) : '');
 	$counts['chartfile'] = ($chartfile !== '' && is_readable($chartfile) ? basename($chartfile) : '');
 	$steps = array(
-		'chart'   => anychartlab_load_rules($chartfile),
-		'generic' => anychartlab_load_rules(anychartlab_seed_dir().'/generic.csv'),
+		'user'    => financialreporting_user_rules($db, $entity, 'nature'),	// My rules (Setup > Rule sets) first
+		'chart'   => financialreporting_load_rules($chartfile),
+		'generic' => financialreporting_load_rules(financialreporting_seed_dir().'/generic.csv'),
 	);
 
 	$db->begin();
@@ -325,11 +354,11 @@ function anychartlab_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile 
 				continue;
 			}
 			foreach ($rules as $rule) {
-				if (anychartlab_rule_matches($rule, $acc)) {
+				if (financialreporting_rule_matches($rule, $acc)) {
 					$acc->nature = strtoupper($rule['nature']);
 					$acc->nature_alt = (($rule['nature_alt'] ?? '') !== '' ? strtoupper($rule['nature_alt']) : null);
 					$acc->contra = (int) ($rule['contra'] ?? 0);
-					anychartlab_save_nature($db, $user, $entity, $acc->rowid, $acc->nature, $acc->nature_alt, $acc->contra, $source);
+					financialreporting_save_nature($db, $user, $entity, $acc->rowid, $acc->nature, $acc->nature_alt, $acc->contra, $source);
 					$counts[$source]++;
 					break;
 				}
@@ -349,7 +378,7 @@ function anychartlab_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile 
 				$acc->nature = $parent->nature;
 				$acc->nature_alt = $parent->nature_alt;
 				$acc->contra = 0;	// contra is specific to an account, never inherited
-				anychartlab_save_nature($db, $user, $entity, $acc->rowid, $acc->nature, $acc->nature_alt, 0, 'parent');
+				financialreporting_save_nature($db, $user, $entity, $acc->rowid, $acc->nature, $acc->nature_alt, 0, 'parent');
 				$counts['parent']++;
 				$changed++;
 			}
@@ -366,13 +395,31 @@ function anychartlab_apply_defaults($db, $user, $entity, $pcgversion, $ruleFile 
 }
 
 /**
+ * Accounts that Dolibarr's own accounting setup uses as clearing accounts: they should be
+ * zero, so their nature is CLEARING. Read from Accounting > Setup, so it works with any chart.
+ *
+ * @return array<string,string> account number => translation key of the reason
+ */
+function financialreporting_dolibarr_clearing_accounts()
+{
+	$out = array();
+	foreach (array('ACCOUNTING_ACCOUNT_TRANSFER_CASH' => 'FinRepDolibarrTransfer', 'ACCOUNTING_ACCOUNT_SUSPENSE' => 'FinRepDolibarrSuspense') as $const => $why) {
+		$number = trim(getDolGlobalString($const));
+		if ($number !== '' && $number !== '-1') {
+			$out[$number] = $why;
+		}
+	}
+	return $out;
+}
+
+/**
  * Code of the original design draft that matches the refined model, for the
  * side-by-side comparison (BIFUNCTIONAL / CONTRA_ASSET vs nature_alt / contra).
  *
  * @param object $acc
  * @return string
  */
-function anychartlab_draft_code($acc)
+function financialreporting_draft_code($acc)
 {
 	if ($acc->nature === null) {
 		return 'UNCLASSIFIED';
@@ -402,13 +449,13 @@ function anychartlab_draft_code($acc)
  * @param float  $netdebit debit - credit
  * @return string|null
  */
-function anychartlab_effective_nature($acc, $netdebit)
+function financialreporting_effective_nature($acc, $netdebit)
 {
 	if ($acc->nature === null) {
 		return null;
 	}
 	if ($acc->nature_alt !== null && !$acc->contra && abs($netdebit) >= 0.005) {
-		$side = anychartlab_normal_side($acc->nature);
+		$side = financialreporting_normal_side($acc->nature);
 		if (($side === 'D' && $netdebit < 0) || ($side === 'C' && $netdebit > 0)) {
 			return $acc->nature_alt;
 		}
@@ -425,7 +472,7 @@ function anychartlab_effective_nature($acc, $netdebit)
  * @param int      $to    Timestamp (inclusive)
  * @return array<string,float>
  */
-function anychartlab_balances($db, $entity, $from, $to)
+function financialreporting_balances($db, $entity, $from, $to)
 {
 	$out = array();
 	$sql = "SELECT numero_compte, SUM(debit) as debit, SUM(credit) as credit";
@@ -457,7 +504,7 @@ function anychartlab_balances($db, $entity, $from, $to)
  * @param int    $asof
  * @return array{start:int|null,label:string,warnings:string[]}
  */
-function anychartlab_window_start($db, $entity, $asof)
+function financialreporting_window_start($db, $entity, $asof)
 {
 	$res = array('start' => null, 'label' => 'all entries (no closed fiscal year)', 'warnings' => array());
 	$lastClosedEnd = null;
@@ -491,7 +538,7 @@ function anychartlab_window_start($db, $entity, $asof)
  * @param int $date
  * @return int
  */
-function anychartlab_fiscal_year_start($date)
+function financialreporting_fiscal_year_start($date)
 {
 	$startMonth = max(1, getDolGlobalInt('SOCIETE_FISCAL_MONTH_START', 1));
 	$y = (int) dol_print_date($date, '%Y');
@@ -508,23 +555,23 @@ function anychartlab_fiscal_year_start($date)
  * @param int    $asof
  * @return array
  */
-function anychartlab_build_balance_sheet($db, $entity, $pcgversion, $asof)
+function financialreporting_build_balance_sheet($db, $entity, $pcgversion, $asof)
 {
-	$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
-	$window = anychartlab_window_start($db, $entity, $asof);
-	$balances = anychartlab_balances($db, $entity, $window['start'], $asof);
-	return anychartlab_bs_from_balances($accounts, $balances, $window);
+	$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
+	$window = financialreporting_window_start($db, $entity, $asof);
+	$balances = financialreporting_balances($db, $entity, $window['start'], $asof);
+	return financialreporting_bs_from_balances($accounts, $balances, $window);
 }
 
 /**
  * Balance Sheet from net debits per account (used by the report, and by tests with sample figures).
  *
- * @param array $accounts From anychartlab_load_accounts()
+ * @param array $accounts From financialreporting_load_accounts()
  * @param array $balances account_number => debit - credit
- * @param array $window   From anychartlab_window_start()
+ * @param array $window   From financialreporting_window_start()
  * @return array
  */
-function anychartlab_bs_from_balances($accounts, $balances, $window)
+function financialreporting_bs_from_balances($accounts, $balances, $window)
 {
 	$bs = array(
 		'accounts' => $accounts,
@@ -545,7 +592,7 @@ function anychartlab_bs_from_balances($accounts, $balances, $window)
 			$bs['unknown'][] = array('account_number' => (string) $number, 'netdebit' => $netdebit);
 			continue;
 		}
-		$eff = anychartlab_effective_nature($acc, $netdebit);
+		$eff = financialreporting_effective_nature($acc, $netdebit);
 		if ($eff === null) {
 			$bs['unclassified'][] = array('acc' => $acc, 'netdebit' => $netdebit);
 			continue;
@@ -554,7 +601,7 @@ function anychartlab_bs_from_balances($accounts, $balances, $window)
 			$bs['excluded'] += $netdebit;
 			continue;
 		}
-		if (anychartlab_is_pl($eff)) {
+		if (financialreporting_is_pl($eff)) {
 			$bs['result'] += -$netdebit;
 			$bs['result_lines']++;
 			continue;
@@ -609,21 +656,21 @@ function anychartlab_bs_from_balances($accounts, $balances, $window)
  * @param int    $to
  * @return array
  */
-function anychartlab_build_income_statement($db, $entity, $pcgversion, $from, $to)
+function financialreporting_build_income_statement($db, $entity, $pcgversion, $from, $to)
 {
-	$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
-	$balances = anychartlab_balances($db, $entity, $from, $to);
-	return anychartlab_is_from_balances($accounts, $balances);
+	$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
+	$balances = financialreporting_balances($db, $entity, $from, $to);
+	return financialreporting_is_from_balances($accounts, $balances);
 }
 
 /**
  * Income Statement from net debits per account (used by the report, and by tests with sample figures).
  *
- * @param array $accounts From anychartlab_load_accounts()
+ * @param array $accounts From financialreporting_load_accounts()
  * @param array $balances account_number => debit - credit
  * @return array
  */
-function anychartlab_is_from_balances($accounts, $balances)
+function financialreporting_is_from_balances($accounts, $balances)
 {
 	$is = array(
 		'accounts' => $accounts,
@@ -640,12 +687,12 @@ function anychartlab_is_from_balances($accounts, $balances)
 			$is['unknown'][] = array('account_number' => (string) $number, 'netdebit' => $netdebit);
 			continue;
 		}
-		$eff = anychartlab_effective_nature($acc, $netdebit);
+		$eff = financialreporting_effective_nature($acc, $netdebit);
 		if ($eff === null) {
 			$is['unclassified'][] = array('acc' => $acc, 'netdebit' => $netdebit);
 			continue;
 		}
-		if (!anychartlab_is_pl($eff)) {
+		if (!financialreporting_is_pl($eff)) {
 			continue;
 		}
 		$amount = ($eff === 'INCOME' ? -$netdebit : $netdebit);
@@ -669,7 +716,7 @@ function anychartlab_is_from_balances($accounts, $balances)
  * @param string $accountNumber
  * @return string
  */
-function anychartlab_ledger_url($accountNumber)
+function financialreporting_ledger_url($accountNumber)
 {
 	return DOL_URL_ROOT.'/accountancy/bookkeeping/listbyaccount.php?search_accountancy_code_start='.urlencode($accountNumber).'&search_accountancy_code_end='.urlencode($accountNumber);
 }
@@ -682,7 +729,7 @@ function anychartlab_ledger_url($accountNumber)
  * @param array    $rows
  * @return void
  */
-function anychartlab_send_csv($filename, $header, $rows)
+function financialreporting_send_csv($filename, $header, $rows)
 {
 	header('Content-Type: text/csv; charset=utf-8');
 	header('Content-Disposition: attachment; filename="'.dol_sanitizeFileName($filename).'.csv"');
@@ -703,27 +750,38 @@ function anychartlab_send_csv($filename, $header, $rows)
  * @param string $pcgversion
  * @return void
  */
-function anychartlab_print_nav($current, $pcgversion)
+function financialreporting_print_nav($current, $pcgversion)
 {
-	$pages = array(
-		'trialbalance.php' => 'Trial Balance',
-		'balancesheet.php' => 'Balance Sheet',
-		'incomestatement.php' => 'Income Statement',
-		'cashflow.php' => 'Cash Flow',
-		'aged.php?type=ar' => 'Receivables',
-		'aged.php?type=ap' => 'Payables',
-		'check.php' => 'Classification check',
-		'admin/setup.php' => 'Account natures',
-		'admin/layouts.php' => 'Layouts',
-		'admin/display.php' => 'Display',
+	// two rows: setup pages first, then the reports
+	$rows = array(
+		array(
+			'admin/start.php' => 'Getting started',
+			'admin/wizard.php' => 'Report wizard',
+			'check.php' => 'Classification check',
+			'admin/setup.php' => 'Account natures',
+			'admin/rules.php' => 'Rule sets',
+			'admin/layouts.php' => 'Advanced layouts',
+			'admin/display.php' => 'Display',
+		),
+		array(
+			'trialbalance.php' => 'Trial Balance',
+			'balancesheet.php' => 'Balance Sheet',
+			'incomestatement.php' => 'Income Statement',
+			'cashflow.php' => 'Cash Flow',
+			'aged.php?type=ar' => 'Receivables',
+			'aged.php?type=ap' => 'Payables',
+		),
 	);
-	$base = dol_buildpath('/anychartlab/', 1);
-	print '<div class="opacitymedium" style="margin-bottom:8px">Any-Chart Reports Lab <b>(prototype, Dolibarr issue <a href="https://github.com/Dolibarr/dolibarr/issues/31760" target="_blank" rel="noopener">#31760</a>)</b> · chart: <b>'.dol_escape_htmltag($pcgversion ?: 'none selected').'</b> · ';
-	$links = array();
-	foreach ($pages as $file => $label) {
-		$links[] = ($file === $current ? '<b>'.$label.'</b>' : '<a href="'.$base.$file.'">'.$label.'</a>');
+	$base = dol_buildpath('/financialreporting/', 1);
+	print '<div class="opacitymedium" style="margin-bottom:8px">Financial Reporting <b>(development version, feedback on Dolibarr issue <a href="https://github.com/Dolibarr/dolibarr/issues/31760" target="_blank" rel="noopener">#31760</a>)</b> · chart: <b>'.dol_escape_htmltag($pcgversion ?: 'none selected').'</b>';
+	foreach ($rows as $pages) {
+		$links = array();
+		foreach ($pages as $file => $label) {
+			$links[] = ($file === $current ? '<b>'.$label.'</b>' : '<a href="'.$base.$file.'">'.$label.'</a>');
+		}
+		print '<br>'.implode(' | ', $links);
 	}
-	print implode(' | ', $links).'</div>';
+	print '</div>';
 }
 
 /**
@@ -733,16 +791,16 @@ function anychartlab_print_nav($current, $pcgversion)
  * @param float $amount
  * @return string
  */
-function anychartlab_price($amount)
+function financialreporting_price($amount)
 {
-	$dec = (anychartlab_cfg('DECIMALS') === '0' ? 0 : 2);
+	$dec = (financialreporting_cfg('DECIMALS') === '0' ? 0 : 2);
 	$amount = round((float) price2num($amount, 'MT'), $dec);
 	if (abs($amount) < 0.5 / pow(10, $dec)) {
 		$amount = 0.0;	// avoid "-0.00"
 	}
 	$txt = price(abs($amount), 0, '', 1, $dec, $dec);
 	if ($amount < 0) {
-		return (anychartlab_cfg('NEG_FORMAT') === 'paren' ? '('.$txt.')' : '-'.$txt);
+		return (financialreporting_cfg('NEG_FORMAT') === 'paren' ? '('.$txt.')' : '-'.$txt);
 	}
 	return $txt;
 }
@@ -750,11 +808,11 @@ function anychartlab_price($amount)
 /**
  * Top-level ancestor of an account (walks account_parent until a row has no parent).
  *
- * @param array  $accounts Result of anychartlab_load_accounts()
+ * @param array  $accounts Result of financialreporting_load_accounts()
  * @param object $acc
  * @return object
  */
-function anychartlab_top_account($accounts, $acc)
+function financialreporting_top_account($accounts, $acc)
 {
 	$current = $acc;
 	$seen = array();
@@ -773,14 +831,14 @@ function anychartlab_top_account($accounts, $acc)
  * Group statement lines under their top-level parent account.
  *
  * @param array $lines    Lines of one section: each array('acc' => object, 'amount' => float, 'note' => string)
- * @param array $accounts Result of anychartlab_load_accounts()
+ * @param array $accounts Result of financialreporting_load_accounts()
  * @return array<int,array{top:object,lines:array,subtotal:float}> sorted by parent account number
  */
-function anychartlab_group_lines($lines, $accounts)
+function financialreporting_group_lines($lines, $accounts)
 {
 	$groups = array();
 	foreach ($lines as $l) {
-		$top = anychartlab_top_account($accounts, $l['acc']);
+		$top = financialreporting_top_account($accounts, $l['acc']);
 		$key = $top->account_number;
 		if (!isset($groups[$key])) {
 			$groups[$key] = array('top' => $top, 'lines' => array(), 'subtotal' => 0.0);
@@ -799,14 +857,14 @@ function anychartlab_group_lines($lines, $accounts)
  * Detailed view: a parent with several posting accounts gets a heading, its
  * accounts indented below, then a subtotal. Summary view: one row per parent.
  *
- * @param array  $groups    Result of anychartlab_group_lines()
+ * @param array  $groups    Result of financialreporting_group_lines()
  * @param string $view      'detailed' or 'summary'
  * @param int    $showDraft 1 to show the design-draft code column
  * @param array|null $entries Entries by account number (detailed view only), null = no entries
  * @param string $section   Statement section code, for the sign of entries
  * @return void
  */
-function anychartlab_print_groups($groups, $view, $showDraft, $entries = null, $section = '')
+function financialreporting_print_groups($groups, $view, $showDraft, $entries = null, $section = '')
 {
 	$empty = '<td></td>'.($showDraft ? '<td></td>' : '');
 	foreach ($groups as $g) {
@@ -814,63 +872,63 @@ function anychartlab_print_groups($groups, $view, $showDraft, $entries = null, $
 		$single = (count($g['lines']) === 1 && $g['lines'][0]['acc']->rowid === $top->rowid);
 		if ($view === 'summary' || $single) {
 			$l = ($single ? $g['lines'][0] : null);
-			print '<tr class="oddeven acl-account"><td class="nowraponall"><a href="'.anychartlab_ledger_url($top->account_number).'" target="_blank">'.dol_escape_htmltag($top->account_number).'</a></td>';
+			print '<tr class="oddeven fr-account"><td class="nowraponall"><a href="'.financialreporting_ledger_url($top->account_number).'" target="_blank">'.dol_escape_htmltag($top->account_number).'</a></td>';
 			print '<td>'.dol_escape_htmltag($top->label).($view === 'summary' && !$single ? ' <span class="opacitymedium">('.count($g['lines']).' account'.(count($g['lines']) > 1 ? 's' : '').')</span>' : '').'</td>';
 			print '<td class="opacitymedium">'.dol_escape_htmltag($l ? $l['note'] : '').'</td>';
 			if ($showDraft) {
-				print '<td>'.dol_escape_htmltag($l ? anychartlab_draft_code($l['acc']) : '').'</td>';
+				print '<td>'.dol_escape_htmltag($l ? financialreporting_draft_code($l['acc']) : '').'</td>';
 			}
-			print '<td class="right amount">'.anychartlab_price($g['subtotal']).'</td></tr>';
+			print '<td class="right amount">'.financialreporting_price($g['subtotal']).'</td></tr>';
 			if ($single && $view !== 'summary' && $entries !== null) {
-				anychartlab_print_entries($entries, $top->account_number, ($g['lines'][0]['section'] ?? $section), $showDraft, $top->label);
+				financialreporting_print_entries($entries, $top->account_number, ($g['lines'][0]['section'] ?? $section), $showDraft, $top->label);
 			}
 			continue;
 		}
-		print '<tr class="oddeven acl-parent"><td class="nowraponall">'.dol_escape_htmltag($top->account_number).'</td><td>'.dol_escape_htmltag($top->label).'</td>'.$empty.'<td></td></tr>';
+		print '<tr class="oddeven fr-parent"><td class="nowraponall">'.dol_escape_htmltag($top->account_number).'</td><td>'.dol_escape_htmltag($top->label).'</td>'.$empty.'<td></td></tr>';
 		foreach ($g['lines'] as $l) {
 			$acc = $l['acc'];
-			print '<tr class="oddeven acl-child"><td class="nowraponall"><a href="'.anychartlab_ledger_url($acc->account_number).'" target="_blank">'.dol_escape_htmltag($acc->account_number).'</a></td>';
+			print '<tr class="oddeven fr-child"><td class="nowraponall"><a href="'.financialreporting_ledger_url($acc->account_number).'" target="_blank">'.dol_escape_htmltag($acc->account_number).'</a></td>';
 			print '<td>'.dol_escape_htmltag($acc->label).'</td><td class="opacitymedium">'.dol_escape_htmltag($l['note']).'</td>';
 			if ($showDraft) {
-				print '<td>'.dol_escape_htmltag(anychartlab_draft_code($acc)).'</td>';
+				print '<td>'.dol_escape_htmltag(financialreporting_draft_code($acc)).'</td>';
 			}
-			print '<td class="right amount" style="padding-right:2em">'.anychartlab_price($l['amount']).'</td></tr>';
+			print '<td class="right amount" style="padding-right:2em">'.financialreporting_price($l['amount']).'</td></tr>';
 			if ($entries !== null) {
-				anychartlab_print_entries($entries, $acc->account_number, ($l['section'] ?? $section), $showDraft, $acc->label);
+				financialreporting_print_entries($entries, $acc->account_number, ($l['section'] ?? $section), $showDraft, $acc->label);
 			}
 		}
-		print '<tr class="oddeven acl-subtotal"><td></td><td class="right">Subtotal '.dol_escape_htmltag($top->account_number).'</td>'.$empty.'<td class="right amount">'.anychartlab_price($g['subtotal']).'</td></tr>';
+		print '<tr class="oddeven fr-subtotal"><td></td><td class="right">Subtotal '.dol_escape_htmltag($top->account_number).'</td>'.$empty.'<td class="right amount">'.financialreporting_price($g['subtotal']).'</td></tr>';
 	}
 }
 
 /**
  * CSV rows for one statement section, following the same view.
  *
- * @param array  $groups Result of anychartlab_group_lines()
+ * @param array  $groups Result of financialreporting_group_lines()
  * @param string $view   'detailed' or 'summary'
  * @return array
  */
-function anychartlab_groups_csv($groups, $view, $entries = null, $section = '')
+function financialreporting_groups_csv($groups, $view, $entries = null, $section = '')
 {
 	$rows = array();
 	foreach ($groups as $g) {
 		$top = $g['top'];
 		$single = (count($g['lines']) === 1 && $g['lines'][0]['acc']->rowid === $top->rowid);
 		if ($view === 'summary' || $single) {
-			$rows[] = anychartlab_r(array($top->account_number, $top->label, ($single ? (string) $top->nature : ''), ($single ? $g['lines'][0]['note'] : ''), price2num($g['subtotal'], 'MT')), 'account');
+			$rows[] = financialreporting_r(array($top->account_number, $top->label, ($single ? (string) $top->nature : ''), ($single ? $g['lines'][0]['note'] : ''), price2num($g['subtotal'], 'MT')), 'account');
 			if ($single && $view !== 'summary' && $entries !== null) {
-				$rows = array_merge($rows, anychartlab_entries_csv($entries, $top->account_number, ($g['lines'][0]['section'] ?? $section), $top->label));
+				$rows = array_merge($rows, financialreporting_entries_csv($entries, $top->account_number, ($g['lines'][0]['section'] ?? $section), $top->label));
 			}
 			continue;
 		}
-		$rows[] = anychartlab_r(array($top->account_number, $top->label, '', '', ''), 'parent');
+		$rows[] = financialreporting_r(array($top->account_number, $top->label, '', '', ''), 'parent');
 		foreach ($g['lines'] as $l) {
-			$rows[] = anychartlab_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, $l['note'], price2num($l['amount'], 'MT')), 'child');
+			$rows[] = financialreporting_r(array($l['acc']->account_number, $l['acc']->label, (string) $l['acc']->nature, $l['note'], price2num($l['amount'], 'MT')), 'child');
 			if ($entries !== null) {
-				$rows = array_merge($rows, anychartlab_entries_csv($entries, $l['acc']->account_number, ($l['section'] ?? $section), $l['acc']->label));
+				$rows = array_merge($rows, financialreporting_entries_csv($entries, $l['acc']->account_number, ($l['section'] ?? $section), $l['acc']->label));
 			}
 		}
-		$rows[] = anychartlab_r(array('', 'Subtotal '.$top->account_number, '', '', price2num($g['subtotal'], 'MT')), 'subtotal');
+		$rows[] = financialreporting_r(array('', 'Subtotal '.$top->account_number, '', '', price2num($g['subtotal'], 'MT')), 'subtotal');
 	}
 	return $rows;
 }
@@ -885,7 +943,7 @@ function anychartlab_groups_csv($groups, $view, $entries = null, $section = '')
  * @param int      $to
  * @return array<string,array<int,array{date:int,ref:string,journal:string,party:string,label:string,debit:float,credit:float}>>
  */
-function anychartlab_load_entries($db, $entity, $from, $to)
+function financialreporting_load_entries($db, $entity, $from, $to)
 {
 	$out = array();
 	$sql = "SELECT ab.numero_compte, ab.doc_date, ab.doc_ref, ab.code_journal, ab.label_operation, ab.debit, ab.credit,";
@@ -922,10 +980,10 @@ function anychartlab_load_entries($db, $entity, $from, $to)
  * Amount of one entry as shown in a statement section (same sign as the section's lines).
  *
  * @param string $section ASSET, LIABILITY, EQUITY, INCOME or EXPENSE
- * @param array  $e       Entry from anychartlab_load_entries()
+ * @param array  $e       Entry from financialreporting_load_entries()
  * @return float
  */
-function anychartlab_entry_amount($section, $e)
+function financialreporting_entry_amount($section, $e)
 {
 	return (in_array($section, array('ASSET', 'EXPENSE')) ? $e['debit'] - $e['credit'] : $e['credit'] - $e['debit']);
 }
@@ -939,14 +997,14 @@ function anychartlab_entry_amount($section, $e)
  * @param int    $showDraft
  * @return void
  */
-function anychartlab_print_entries($entries, $number, $section, $showDraft, $accLabel = '')
+function financialreporting_print_entries($entries, $number, $section, $showDraft, $accLabel = '')
 {
 	foreach ($entries[$number] ?? array() as $e) {
-		$desc = anychartlab_entry_description($e, $accLabel);
-		print '<tr class="oddeven acl-entry"><td class="nowraponall">'.dol_print_date($e['date'], 'day').'</td>';
+		$desc = financialreporting_entry_description($e, $accLabel);
+		print '<tr class="oddeven fr-entry"><td class="nowraponall">'.dol_print_date($e['date'], 'day').'</td>';
 		print '<td>'.dol_escape_htmltag($e['ref']).($e['journal'] !== '' ? ' <span class="opacitymedium">('.dol_escape_htmltag($e['journal']).')</span>' : '').'</td>';
 		print '<td class="tdoverflowmax300" title="'.dol_escape_htmltag($desc).'">'.dol_escape_htmltag($desc).'</td>'.($showDraft ? '<td></td>' : '');
-		print '<td class="right amount">'.anychartlab_price(anychartlab_entry_amount($section, $e)).'</td></tr>';
+		print '<td class="right amount">'.financialreporting_price(financialreporting_entry_amount($section, $e)).'</td></tr>';
 	}
 }
 
@@ -958,11 +1016,11 @@ function anychartlab_print_entries($entries, $number, $section, $showDraft, $acc
  * @param string $section
  * @return array
  */
-function anychartlab_entries_csv($entries, $number, $section, $accLabel = '')
+function financialreporting_entries_csv($entries, $number, $section, $accLabel = '')
 {
 	$rows = array();
 	foreach ($entries[$number] ?? array() as $e) {
-		$rows[] = anychartlab_r(array(dol_print_date($e['date'], '%Y-%m-%d'), $e['ref'].($e['journal'] !== '' ? ' ('.$e['journal'].')' : ''), anychartlab_entry_description($e, $accLabel), '', price2num(anychartlab_entry_amount($section, $e), 'MT')), 'entry');
+		$rows[] = financialreporting_r(array(dol_print_date($e['date'], '%Y-%m-%d'), $e['ref'].($e['journal'] !== '' ? ' ('.$e['journal'].')' : ''), financialreporting_entry_description($e, $accLabel), '', price2num(financialreporting_entry_amount($section, $e), 'MT')), 'entry');
 	}
 	return $rows;
 }
@@ -972,11 +1030,11 @@ function anychartlab_entries_csv($entries, $number, $section, $accLabel = '')
  * Dolibarr's labels read "Party (truncated) - Ref - Account label", which repeats
  * what is already shown, so those parts are dropped.
  *
- * @param array  $e        Entry from anychartlab_load_entries()
+ * @param array  $e        Entry from financialreporting_load_entries()
  * @param string $accLabel Label of the account the entry is shown under
  * @return string
  */
-function anychartlab_entry_description($e, $accLabel)
+function financialreporting_entry_description($e, $accLabel)
 {
 	$keep = array();
 	$label = $e['label'];
@@ -1003,7 +1061,7 @@ function anychartlab_entry_description($e, $accLabel)
  * @param string $kind
  * @return array{cells:array,kind:string}
  */
-function anychartlab_r($cells, $kind)
+function financialreporting_r($cells, $kind)
 {
 	return array('cells' => $cells, 'kind' => $kind);
 }
@@ -1016,14 +1074,14 @@ function anychartlab_r($cells, $kind)
  * @param string $filename
  * @param string $title
  * @param string $subtitle
- * @param array  $rows     Rows from anychartlab_r() (cells: account, label, nature, note, amount)
+ * @param array  $rows     Rows from financialreporting_r() (cells: account, label, nature, note, amount)
  * @param bool   $inline   true = show in the browser (preview)
  * @return void
  */
-function anychartlab_send_pdf($filename, $title, $subtitle, $rows, $inline)
+function financialreporting_send_pdf($filename, $title, $subtitle, $rows, $inline)
 {
-	$showAcc = (anychartlab_cfg('PDF_SHOW_ACCOUNT_COL') !== '0');
-	$showNote = (anychartlab_cfg('PDF_SHOW_NOTE_COL') !== '0');
+	$showAcc = (financialreporting_cfg('PDF_SHOW_ACCOUNT_COL') !== '0');
+	$showNote = (financialreporting_cfg('PDF_SHOW_NOTE_COL') !== '0');
 	$f = array($showAcc ? 0.15 : 0.0, 0.45, $showNote ? 0.22 : 0.0, 0.18);
 	$f[1] += (1 - array_sum($f));
 	$columns = array(
@@ -1037,14 +1095,14 @@ function anychartlab_send_pdf($filename, $title, $subtitle, $rows, $inline)
 		$kind = $row['kind'] ?? 'account';
 		$c = $row['cells'];
 		$note = ($kind === 'entry' ? (string) $c[2] : (string) $c[3]);	// entries carry their description in the third column
-		$cells = array((string) $c[0], (string) $c[1], $note, ((string) $c[4] === '' ? '' : anychartlab_price($c[4])));
+		$cells = array((string) $c[0], (string) $c[1], $note, ((string) $c[4] === '' ? '' : financialreporting_price($c[4])));
 		if (!$showAcc && $kind !== 'section') {
 			// account number moves in front of the label when the account column is off
 			$cells[1] = trim(($kind === 'entry' ? $cells[0].'  ' : ($cells[0] !== '' ? $cells[0].' ' : '')).$cells[1]);
 		}
 		$out[] = array('kind' => $kind, 'cells' => $cells);
 	}
-	anychartlab_pdf_table($filename, $title, $subtitle, $columns, $out, $inline);
+	financialreporting_pdf_table($filename, $title, $subtitle, $columns, $out, $inline);
 }
 
 /**
@@ -1061,22 +1119,22 @@ function anychartlab_send_pdf($filename, $title, $subtitle, $rows, $inline)
  * @param float  $maxFont  0 = Display setting, else at most this base font size (many columns)
  * @return void
  */
-function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $inline, $orientation = '', $maxFont = 0)
+function financialreporting_pdf_table($filename, $title, $subtitle, $columns, $rows, $inline, $orientation = '', $maxFont = 0)
 {
 	global $conf, $langs, $mysoc;
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
 
-	$paper = anychartlab_cfg('PDF_PAPER');
+	$paper = financialreporting_cfg('PDF_PAPER');
 	if ($orientation !== 'L' && $orientation !== 'P') {
-		$orientation = (anychartlab_cfg('PDF_ORIENTATION') === 'L' ? 'L' : 'P');
+		$orientation = (financialreporting_cfg('PDF_ORIENTATION') === 'L' ? 'L' : 'P');
 	}
-	$margin = max(5, min(40, (float) anychartlab_cfg('PDF_MARGIN')));
-	$base = max(6, min(14, (float) anychartlab_cfg('PDF_FONTSIZE')));
+	$margin = max(5, min(40, (float) financialreporting_cfg('PDF_MARGIN')));
+	$base = max(6, min(14, (float) financialreporting_cfg('PDF_FONTSIZE')));
 	if ($maxFont > 0) {
 		$base = min($base, $maxFont);
 	}
-	$titleSize = max(8, min(28, (float) anychartlab_cfg('PDF_TITLESIZE')));
-	$font = (anychartlab_cfg('PDF_FONT') !== '' ? anychartlab_cfg('PDF_FONT') : pdf_getPDFFont($langs));
+	$titleSize = max(8, min(28, (float) financialreporting_cfg('PDF_TITLESIZE')));
+	$font = (financialreporting_cfg('PDF_FONT') !== '' ? financialreporting_cfg('PDF_FONT') : pdf_getPDFFont($langs));
 
 	$format = ($paper !== '' ? $paper : getDolGlobalString('MAIN_PDF_FORMAT', 'A4'));
 	$pdf = pdf_getInstance($format, 'mm', $orientation);
@@ -1086,7 +1144,7 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 	$pdf->SetMargins($margin, $margin, $margin);
 	$pdf->SetAutoPageBreak(false, $margin + 5);
 	$pdf->SetTitle($title);
-	$pdf->SetCreator('Dolibarr '.DOL_VERSION.' - Any-Chart Reports Lab');
+	$pdf->SetCreator('Dolibarr '.DOL_VERSION.' - Financial Reporting');
 
 	$left = $margin;
 	$printWidth = $pdf->getPageWidth() - 2 * $margin;
@@ -1114,14 +1172,14 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 	$bottom = $pdf->getPageHeight() - $margin - 5;
 
 	$logo = '';
-	if (anychartlab_cfg('PDF_SHOW_LOGO') === '1' && !empty($mysoc->logo)) {
+	if (financialreporting_cfg('PDF_SHOW_LOGO') === '1' && !empty($mysoc->logo)) {
 		$candidate = $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
 		if (is_readable($candidate)) {
 			$logo = $candidate;
 		}
 	}
-	$heading = (anychartlab_cfg('PDF_SHOW_COMPANY') === '1' ? (trim(anychartlab_cfg('PDF_COMPANY_TEXT')) !== '' ? trim(anychartlab_cfg('PDF_COMPANY_TEXT')) : (string) ($mysoc->name ?? '')) : '');
-	$showPeriod = (anychartlab_cfg('PDF_SHOW_PERIOD') !== '0');
+	$heading = (financialreporting_cfg('PDF_SHOW_COMPANY') === '1' ? (trim(financialreporting_cfg('PDF_COMPANY_TEXT')) !== '' ? trim(financialreporting_cfg('PDF_COMPANY_TEXT')) : (string) ($mysoc->name ?? '')) : '');
+	$showPeriod = (financialreporting_cfg('PDF_SHOW_PERIOD') !== '0');
 
 	$header = function () use ($pdf, $left, $printWidth, $title, $subtitle, $w, $aligns, $colTitles, $base, $titleSize, $logo, $heading, $showPeriod) {
 		$pdf->AddPage();
@@ -1152,7 +1210,7 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 		foreach ($colTitles as $i => $col) {
 			if ($w[$i] > 0) {
 				$pdf->SetXY($x, $y);
-				$pdf->Cell($w[$i], 6, anychartlab_pdf_fit($pdf, $col, $w[$i]), 0, 0, $aligns[$i], true);
+				$pdf->Cell($w[$i], 6, financialreporting_pdf_fit($pdf, $col, $w[$i]), 0, 0, $aligns[$i], true);
 			}
 			$x += $w[$i];
 		}
@@ -1162,7 +1220,7 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 	$y = $header();
 	foreach ($rows as $row) {
 		$kind = $row['kind'] ?? 'account';
-		$st = anychartlab_style($kind);
+		$st = financialreporting_style($kind);
 		$cells = array();
 		foreach (array_keys($w) as $i) {
 			$cells[$i] = (string) ($row['cells'][$i] ?? '');
@@ -1202,7 +1260,7 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 			// a heading: its text runs across all text columns, amounts stay in their columns
 			$labelWidth = $xAmount - $left - $indent;
 			$pdf->SetXY($left + $indent, $y);
-			$pdf->Cell($labelWidth, $h, anychartlab_pdf_fit($pdf, trim($cells[0].' '.($cells[1] ?? '')), $labelWidth), 0, 0, 'L');
+			$pdf->Cell($labelWidth, $h, financialreporting_pdf_fit($pdf, trim($cells[0].' '.($cells[1] ?? '')), $labelWidth), 0, 0, 'L');
 			$x = $xAmount;
 			for ($i = $firstAmount; $i < count($w); $i++) {
 				$pdf->SetXY($x, $y);
@@ -1224,15 +1282,15 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
 			if ($aligns[$i] === 'R') {
 				$width -= $indent / 2;
 			}
-			$pdf->Cell(max(1, $width), $h, anychartlab_pdf_fit($pdf, $text, max(1, $width)), 0, 0, $aligns[$i]);
+			$pdf->Cell(max(1, $width), $h, financialreporting_pdf_fit($pdf, $text, max(1, $width)), 0, 0, $aligns[$i]);
 			$x += $w[$i];
 		}
 		$y += $h;
 	}
 	$pdf->SetTextColor(0);
-	$footer = trim(anychartlab_cfg('PDF_FOOTER_TEXT'));
-	$showDate = (anychartlab_cfg('PDF_SHOW_PRINTDATE') !== '0');
-	$showPage = (anychartlab_cfg('PDF_SHOW_PAGENUM') !== '0');
+	$footer = trim(financialreporting_cfg('PDF_FOOTER_TEXT'));
+	$showDate = (financialreporting_cfg('PDF_SHOW_PRINTDATE') !== '0');
+	$showPage = (financialreporting_cfg('PDF_SHOW_PAGENUM') !== '0');
 	$n = $pdf->getNumPages();
 	for ($p = 1; $p <= $n; $p++) {
 		$pdf->setPage($p);
@@ -1264,7 +1322,7 @@ function anychartlab_pdf_table($filename, $title, $subtitle, $columns, $rows, $i
  * @param float  $widthMm
  * @return string
  */
-function anychartlab_pdf_fit($pdf, $text, $widthMm)
+function financialreporting_pdf_fit($pdf, $text, $widthMm)
 {
 	$available = $widthMm - 1.5;
 	if ($pdf->GetStringWidth($text) <= $available) {
@@ -1278,11 +1336,11 @@ function anychartlab_pdf_fit($pdf, $text, $widthMm)
 
 /**
  * Display settings of the module, with their defaults.
- * Stored as module constants ANYCHARTLAB_<KEY> (Accounting > Any-Chart Reports Lab > Display).
+ * Stored as module constants FINANCIALREPORTING_<KEY> (Accounting > Financial Reporting > Display).
  *
  * @return array<string,string> key => default
  */
-function anychartlab_display_defaults()
+function financialreporting_display_defaults()
 {
 	return array(
 		'PDF_PAPER' => '',				// '' = Dolibarr default (MAIN_PDF_FORMAT), A4, LETTER, LEGAL
@@ -1295,7 +1353,7 @@ function anychartlab_display_defaults()
 		'PDF_COMPANY_TEXT' => '',		// '' = company name from Setup > Company
 		'PDF_SHOW_LOGO' => '0',
 		'PDF_SHOW_PERIOD' => '1',
-		'PDF_FOOTER_TEXT' => 'Any-Chart Reports Lab (prototype)',
+		'PDF_FOOTER_TEXT' => 'Financial Reporting',
 		'PDF_SHOW_PRINTDATE' => '1',
 		'PDF_SHOW_PAGENUM' => '1',
 		'PDF_SHOW_ACCOUNT_COL' => '1',
@@ -1306,19 +1364,21 @@ function anychartlab_display_defaults()
 		'DEFAULT_HIDE_EMPTY' => '0',
 		'DEFAULT_SHOW_ENTRIES' => '0',
 		'AGED_ORDER' => 'oldest',		// ageing columns: oldest first (90+ ... not due) or newest first
+		'BS_ORDER' => '',				// balance sheet classes: '' = by company country, current (current and cash first), noncurrent
+		'DEFAULT_BS_SPLIT' => '1',		// balance sheet by nature: split each side by account class
 	);
 }
 
 /**
  * Value of one display setting.
  *
- * @param string $key Key of anychartlab_display_defaults()
+ * @param string $key Key of financialreporting_display_defaults()
  * @return string
  */
-function anychartlab_cfg($key)
+function financialreporting_cfg($key)
 {
-	$defaults = anychartlab_display_defaults();
-	$name = 'ANYCHARTLAB_'.$key;
+	$defaults = financialreporting_display_defaults();
+	$name = 'FINANCIALREPORTING_'.$key;
 	if (getDolGlobalString($name) === '' && !isset($GLOBALS['conf']->global->$name)) {
 		return (string) ($defaults[$key] ?? '');
 	}
@@ -1330,7 +1390,7 @@ function anychartlab_cfg($key)
  *
  * @return array<string,string> kind => label
  */
-function anychartlab_style_kinds()
+function financialreporting_style_kinds()
 {
 	return array(
 		'section' => 'Heading (layout heading / statement section)',
@@ -1351,7 +1411,7 @@ function anychartlab_style_kinds()
  *
  * @return array<string,array<string,mixed>>
  */
-function anychartlab_style_defaults()
+function financialreporting_style_defaults()
 {
 	$d = array('font' => '', 'size' => 0, 'bold' => 0, 'italic' => 0, 'upper' => 0, 'indent' => 0, 'line' => 'none', 'shade' => 0, 'colour' => '#000000');
 	return array(
@@ -1368,20 +1428,20 @@ function anychartlab_style_defaults()
 }
 
 /**
- * Style of one kind of line: defaults merged with the saved setting ANYCHARTLAB_STYLE_<KIND> (JSON).
+ * Style of one kind of line: defaults merged with the saved setting FINANCIALREPORTING_STYLE_<KIND> (JSON).
  *
  * @param string $kind
  * @return array<string,mixed>
  */
-function anychartlab_style($kind)
+function financialreporting_style($kind)
 {
 	static $cache = array();
 	if (isset($cache[$kind])) {
 		return $cache[$kind];
 	}
-	$defaults = anychartlab_style_defaults();
+	$defaults = financialreporting_style_defaults();
 	$style = $defaults[$kind] ?? $defaults['account'];
-	$saved = json_decode(getDolGlobalString('ANYCHARTLAB_STYLE_'.strtoupper($kind)), true);
+	$saved = json_decode(getDolGlobalString('FINANCIALREPORTING_STYLE_'.strtoupper($kind)), true);
 	if (is_array($saved)) {
 		foreach ($style as $k => $v) {
 			if (array_key_exists($k, $saved)) {
@@ -1404,7 +1464,7 @@ function anychartlab_style($kind)
  * @param string $font
  * @return string
  */
-function anychartlab_css_font($font)
+function financialreporting_css_font($font)
 {
 	$map = array('helvetica' => 'Helvetica, Arial, sans-serif', 'times' => '"Times New Roman", Times, serif', 'courier' => '"Courier New", Courier, monospace', 'dejavusans' => '"DejaVu Sans", Verdana, sans-serif', 'freesans' => 'FreeSans, Arial, sans-serif');
 	return $map[$font] ?? '';
@@ -1415,18 +1475,18 @@ function anychartlab_css_font($font)
  *
  * @return void
  */
-function anychartlab_print_style_css()
+function financialreporting_print_style_css()
 {
 	$css = '';
-	foreach (array_keys(anychartlab_style_kinds()) as $kind) {
-		$s = anychartlab_style($kind);
-		$sel = 'table.noborder tr.acl-'.$kind;
+	foreach (array_keys(financialreporting_style_kinds()) as $kind) {
+		$s = financialreporting_style($kind);
+		$sel = 'table.noborder tr.fr-'.$kind;
 		$rules = 'font-weight:'.($s['bold'] ? 'bold' : 'normal').' !important;';
 		$rules .= 'font-style:'.($s['italic'] ? 'italic' : 'normal').' !important;';
 		$rules .= ($s['upper'] ? 'text-transform:uppercase;' : '');
 		$rules .= ((float) $s['size'] != 0 ? 'font-size:calc(1em + '.((float) $s['size']).'pt) !important;' : '');
 		$rules .= 'color:'.$s['colour'].' !important;';
-		$rules .= (anychartlab_css_font($s['font']) !== '' ? 'font-family:'.anychartlab_css_font($s['font']).' !important;' : '');
+		$rules .= (financialreporting_css_font($s['font']) !== '' ? 'font-family:'.financialreporting_css_font($s['font']).' !important;' : '');
 		$rules .= ($s['shade'] ? 'background-color:#f0f0f0 !important;' : '');
 		$css .= $sel.' td, '.$sel.' th {'.$rules.'}'."\n";
 		$css .= $sel.' td a {color:inherit !important;}'."\n";
@@ -1451,10 +1511,10 @@ function anychartlab_print_style_css()
  *
  * @return array<int,array{kind:string,file:string,countries:string[],charts:string[],label:string}>
  */
-function anychartlab_catalog()
+function financialreporting_catalog()
 {
 	$out = array();
-	$fh = @fopen(anychartlab_seed_dir().'/catalog.csv', 'r');
+	$fh = @fopen(financialreporting_seed_dir().'/catalog.csv', 'r');
 	if (!$fh) {
 		return $out;
 	}
@@ -1490,7 +1550,7 @@ function anychartlab_catalog()
  *
  * @return string e.g. FR, AU
  */
-function anychartlab_country_code()
+function financialreporting_country_code()
 {
 	global $mysoc;
 	return strtoupper((string) ($mysoc->country_code ?? ''));
@@ -1504,11 +1564,11 @@ function anychartlab_country_code()
  * @param string $pcgversion
  * @return array
  */
-function anychartlab_catalog_ranked($kind, $pcgversion)
+function financialreporting_catalog_ranked($kind, $pcgversion)
 {
-	$country = anychartlab_country_code();
+	$country = financialreporting_country_code();
 	$ranked = array('chart' => array(), 'country' => array(), '' => array());
-	foreach (anychartlab_catalog() as $e) {
+	foreach (financialreporting_catalog() as $e) {
 		if ($e['kind'] !== $kind) {
 			continue;
 		}
@@ -1526,15 +1586,15 @@ function anychartlab_catalog_ranked($kind, $pcgversion)
  * @param string $pcgversion
  * @return array{file:string,label:string,match:string}|null
  */
-function anychartlab_suggest_ruleset($pcgversion)
+function financialreporting_suggest_ruleset($pcgversion)
 {
-	foreach (anychartlab_catalog_ranked('nature', $pcgversion) as $e) {
+	foreach (financialreporting_catalog_ranked('nature', $pcgversion) as $e) {
 		if ($e['match'] !== '') {
 			return array('file' => $e['file'], 'label' => $e['label'], 'match' => $e['match']);
 		}
 	}
 	$legacy = dol_sanitizeFileName($pcgversion).'.csv';
-	if ($pcgversion !== '' && is_readable(anychartlab_seed_dir().'/'.$legacy)) {
+	if ($pcgversion !== '' && is_readable(financialreporting_seed_dir().'/'.$legacy)) {
 		return array('file' => $legacy, 'label' => $legacy, 'match' => 'chart');
 	}
 	return null;
@@ -1546,10 +1606,10 @@ function anychartlab_suggest_ruleset($pcgversion)
  * @param string $pcgversion
  * @return array
  */
-function anychartlab_suggest_layouts($pcgversion)
+function financialreporting_suggest_layouts($pcgversion)
 {
 	$out = array();
-	foreach (anychartlab_catalog_ranked('layout', $pcgversion) as $e) {
+	foreach (financialreporting_catalog_ranked('layout', $pcgversion) as $e) {
 		if ($e['match'] !== '') {
 			$out[] = $e;
 		}

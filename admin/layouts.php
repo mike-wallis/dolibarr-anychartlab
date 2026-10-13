@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — statement layouts (list and on-screen editor).
+ * Financial Reporting — statement layouts (list and on-screen editor).
  *
  * Layouts are stored in this module's own tables. They can be created empty,
  * copied from Dolibarr's personalised reports (read only, core is never written),
@@ -18,18 +18,21 @@ if (!$res && is_file('../../../main.inc.php')) {
 if (!$res) {
 	die('Include of main fails');
 }
-require_once dirname(__DIR__).'/lib/anychartlab.lib.php';
+require_once dirname(__DIR__).'/lib/financialreporting.lib.php';
 require_once dirname(__DIR__).'/lib/layout.lib.php';
 
-if (!$user->hasRight('anychartlab', 'setup') && !$user->admin) {
+if (!isModEnabled('financialreporting')) {
+	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
+}
+if (!$user->hasRight('financialreporting', 'setup') && !$user->admin) {
 	accessforbidden();
 }
 
 $action = GETPOST('action', 'aZ09');
 $id = GETPOSTINT('id');
 $entity = (int) $conf->entity;
-$pcgversion = anychartlab_active_chart($db);
-$natures = anychartlab_natures();
+$pcgversion = financialreporting_active_chart($db);
+$natures = financialreporting_natures();
 $statements = array('BS' => 'Balance Sheet', 'IS' => 'Income Statement');
 $self = $_SERVER['PHP_SELF'];
 
@@ -38,41 +41,41 @@ $self = $_SERVER['PHP_SELF'];
  */
 
 if ($action === 'create') {
-	$newid = anychartlab_layout_create($db, $entity, GETPOST('new_code', 'alphanohtml') ?: 'MY-LAYOUT', GETPOST('new_label', 'alphanohtml'), GETPOST('new_statement', 'aZ09'), '', 'manual', '');
+	$newid = financialreporting_layout_create($db, $entity, GETPOST('new_code', 'alphanohtml') ?: 'MY-LAYOUT', GETPOST('new_label', 'alphanohtml'), GETPOST('new_statement', 'aZ09'), '', 'manual', '');
 	header('Location: '.$self.($newid > 0 ? '?id='.$newid : ''));
 	exit;
 }
 if ($action === 'copycore' && $pcgversion !== '') {
-	$newid = anychartlab_layout_copy_core($db, $entity, $pcgversion, GETPOSTINT('core_report'), GETPOST('core_statement', 'aZ09') === 'IS' ? 'IS' : 'BS');
+	$newid = financialreporting_layout_copy_core($db, $entity, $pcgversion, GETPOSTINT('core_report'), GETPOST('core_statement', 'aZ09') === 'IS' ? 'IS' : 'BS');
 	setEventMessages($newid > 0 ? 'Personalised report copied into a new lab layout. Dolibarr\'s own personalised groups were only read, not changed.' : 'Copy failed.', null, $newid > 0 ? 'mesgs' : 'errors');
 	header('Location: '.$self.($newid > 0 ? '?id='.$newid : ''));
 	exit;
 }
 if ($action === 'loadfile' && $pcgversion !== '') {
 	$file = basename(GETPOST('layout_file', 'alphanohtml'));
-	$r = anychartlab_layout_import($db, $entity, $pcgversion, anychartlab_layout_read_csv(anychartlab_seed_dir().'/layouts/'.$file), 'file', $file);
+	$r = financialreporting_layout_import($db, $entity, $pcgversion, financialreporting_layout_read_csv(financialreporting_seed_dir().'/layouts/'.$file), 'file', $file);
 	setEventMessages(count($r['created']).' layout(s) loaded from '.$file.'.', $r['errors'], $r['errors'] ? 'warnings' : 'mesgs');
 	header('Location: '.$self.(count($r['created']) === 1 ? '?id='.$r['created'][0] : ''));
 	exit;
 }
 if ($action === 'import' && $pcgversion !== '' && !empty($_FILES['importfile']['tmp_name'])) {
-	$r = anychartlab_layout_import($db, $entity, $pcgversion, anychartlab_layout_read_csv($_FILES['importfile']['tmp_name']), 'import', dol_sanitizeFileName($_FILES['importfile']['name']));
+	$r = financialreporting_layout_import($db, $entity, $pcgversion, financialreporting_layout_read_csv($_FILES['importfile']['tmp_name']), 'import', dol_sanitizeFileName($_FILES['importfile']['name']));
 	setEventMessages(count($r['created']).' layout(s) imported.', $r['errors'], $r['errors'] ? 'warnings' : 'mesgs');
 	header('Location: '.$self);
 	exit;
 }
 if ($action === 'confirm_delete' && GETPOST('confirm', 'alpha') === 'yes' && $id) {
-	anychartlab_layout_delete($db, $entity, $id);
+	financialreporting_layout_delete($db, $entity, $id);
 	setEventMessages('Layout deleted.', null);
 	header('Location: '.$self);
 	exit;
 }
 if (($action === 'export' || $action === 'duplicate') && $id) {
-	$layout = anychartlab_layout_fetch($db, $id, $entity);
+	$layout = financialreporting_layout_fetch($db, $id, $entity);
 	if ($layout) {
-		$rows = anychartlab_layout_export_rows($layout, anychartlab_load_accounts($db, $entity, $pcgversion));
+		$rows = financialreporting_layout_export_rows($layout, financialreporting_load_accounts($db, $entity, $pcgversion));
 		if ($action === 'export') {
-			anychartlab_send_csv('anychartlab-layout-'.$layout->code, anychartlab_layout_csv_columns(), $rows);
+			financialreporting_send_csv('financialreporting-layout-'.$layout->code, financialreporting_layout_csv_columns(), $rows);
 		}
 		foreach ($rows as &$r) {
 			$r[0] = $layout->code.'-COPY';
@@ -81,16 +84,16 @@ if (($action === 'export' || $action === 'duplicate') && $id) {
 		unset($r);
 		$assoc = array();
 		foreach ($rows as $r) {
-			$assoc[] = array_combine(anychartlab_layout_csv_columns(), $r);
+			$assoc[] = array_combine(financialreporting_layout_csv_columns(), $r);
 		}
-		$res2 = anychartlab_layout_import($db, $entity, $pcgversion, $assoc, 'manual', 'copy of '.$layout->code);
+		$res2 = financialreporting_layout_import($db, $entity, $pcgversion, $assoc, 'manual', 'copy of '.$layout->code);
 		header('Location: '.$self.($res2['created'] ? '?id='.$res2['created'][0] : ''));
 		exit;
 	}
 }
 if (($action === 'up' || $action === 'down') && $id) {
 	$lineid = GETPOSTINT('lineid');
-	$layout = anychartlab_layout_fetch($db, $id, $entity);
+	$layout = financialreporting_layout_fetch($db, $id, $entity);
 	if ($layout) {
 		$ids = array_map(function ($l) {
 			return (int) $l->rowid;
@@ -102,7 +105,7 @@ if (($action === 'up' || $action === 'down') && $id) {
 			$ids[$k] = $ids[$j];
 			$ids[$j] = $tmp;
 			foreach ($ids as $i => $lid) {
-				$db->query("UPDATE ".MAIN_DB_PREFIX."anychartlab_layout_line SET position = ".(($i + 1) * 10)." WHERE rowid = ".((int) $lid));
+				$db->query("UPDATE ".MAIN_DB_PREFIX."financialreporting_layout_line SET position = ".(($i + 1) * 10)." WHERE rowid = ".((int) $lid));
 			}
 		}
 	}
@@ -110,15 +113,15 @@ if (($action === 'up' || $action === 'down') && $id) {
 	exit;
 }
 if ($action === 'save' && $id) {
-	$layout = anychartlab_layout_fetch($db, $id, $entity);
+	$layout = financialreporting_layout_fetch($db, $id, $entity);
 	if ($layout) {
 		$db->begin();
-		$db->query("UPDATE ".MAIN_DB_PREFIX."anychartlab_layout SET label = '".$db->escape(GETPOST('label', 'alphanohtml') ?: $layout->label)."', statement = '".(GETPOST('statement', 'aZ09') === 'IS' ? 'IS' : 'BS')."', country_code = ".(GETPOST('country_code', 'aZ09') !== '' ? "'".$db->escape(GETPOST('country_code', 'aZ09'))."'" : "NULL")." WHERE rowid = ".((int) $id));
+		$db->query("UPDATE ".MAIN_DB_PREFIX."financialreporting_layout SET label = '".$db->escape(GETPOST('label', 'alphanohtml') ?: $layout->label)."', statement = '".(GETPOST('statement', 'aZ09') === 'IS' ? 'IS' : 'BS')."', country_code = ".(GETPOST('country_code', 'aZ09') !== '' ? "'".$db->escape(GETPOST('country_code', 'aZ09'))."'" : "NULL")." WHERE rowid = ".((int) $id));
 		$del = GETPOST('delete_line', 'array:int');
 		foreach ($layout->lines as $l) {
 			$lid = (int) $l->rowid;
 			if (in_array($lid, $del)) {
-				anychartlab_layout_delete_line($db, $id, $lid);
+				financialreporting_layout_delete_line($db, $id, $lid);
 				continue;
 			}
 			$data = array(
@@ -131,13 +134,13 @@ if ($action === 'save' && $id) {
 				'formula' => GETPOST('formula_'.$lid, 'alphanohtml'),
 				'sign' => GETPOST('sign_'.$lid, 'aZ09'),
 			);
-			anychartlab_layout_save_line($db, $id, $lid, $data);
+			financialreporting_layout_save_line($db, $id, $lid, $data);
 			if ($data['type'] === 'group') {
-				anychartlab_layout_set_explicit($db, $lid, GETPOST('explicit_'.$lid, 'array:int'));
+				financialreporting_layout_set_explicit($db, $lid, GETPOST('explicit_'.$lid, 'array:int'));
 			}
 		}
 		if (trim(GETPOST('label_new', 'alphanohtml')) !== '' || trim(GETPOST('code_new', 'alphanohtml')) !== '') {
-			$lid = anychartlab_layout_save_line($db, $id, 0, array(
+			$lid = financialreporting_layout_save_line($db, $id, 0, array(
 				'position' => GETPOSTINT('position_new') ?: 9999,
 				'code' => GETPOST('code_new', 'alphanohtml'),
 				'label' => GETPOST('label_new', 'alphanohtml'),
@@ -148,7 +151,7 @@ if ($action === 'save' && $id) {
 				'sign' => GETPOST('sign_new', 'aZ09'),
 			));
 		}
-		anychartlab_layout_renumber($db, $id);
+		financialreporting_layout_renumber($db, $id);
 		$db->commit();
 		setEventMessages('Layout saved.', null);
 	}
@@ -161,9 +164,9 @@ if ($action === 'save' && $id) {
  */
 
 $form = new Form($db);
-llxHeader('', 'Statement layouts', '', '', 0, 0, '', '', '', 'mod-anychartlab page-layouts');
-print load_fiche_titre('Statement layouts', '', 'accountancy');
-anychartlab_print_nav('admin/layouts.php', $pcgversion);
+llxHeader('', 'Advanced layouts', '', '', 0, 0, '', '', '', 'mod-financialreporting page-layouts');
+print load_fiche_titre('Advanced layouts', '', 'accountancy');
+financialreporting_print_nav('admin/layouts.php', $pcgversion);
 
 if ($pcgversion === '') {
 	print '<div class="warning">No chart of accounts is selected.</div>';
@@ -171,20 +174,21 @@ if ($pcgversion === '') {
 	exit;
 }
 
-$accounts = anychartlab_load_accounts($db, $entity, $pcgversion);
-$layout = ($id ? anychartlab_layout_fetch($db, $id, $entity) : null);
+$accounts = financialreporting_load_accounts($db, $entity, $pcgversion);
+$layout = ($id ? financialreporting_layout_fetch($db, $id, $entity) : null);
 
 if (!$layout) {
 	// ---- List ----
 	if ($action === 'delete') {
 		print $form->formconfirm($self.'?id='.$id, 'Delete layout', 'Delete this lab layout? Dolibarr\'s personalised reports are not affected.', 'confirm_delete', '', 0, 1);
 	}
+	print '<div class="info"><b>Advanced.</b> For most users, the <a href="'.dol_buildpath('/financialreporting/admin/wizard.php', 1).'">Report wizard</a> is the simpler way: it builds the income statement as a Dolibarr personalised report. Layouts here stay available for what personalised groups cannot do (headings, balance-side filters, balance sheet presentation).</div>';
 	print '<div class="info">A <b>layout</b> arranges the Balance Sheet or Income Statement into the lines your country uses (e.g. current / non-current assets, gross profit). Layouts are stored in this lab only: copying a Dolibarr personalised report <b>reads</b> it and never changes it. Choose a layout on the Balance Sheet or Income Statement page with the <b>Layout</b> selector.</div>';
 
-	$list = anychartlab_layouts_list($db, $entity);
+	$list = financialreporting_layouts_list($db, $entity);
 	print '<table class="noborder centpercent"><tr class="liste_titre"><th>Layout</th><th>Code</th><th>Statement</th><th>Source</th><th class="center">Lines</th><th></th></tr>';
 	foreach ($list as $l) {
-		$test = dol_buildpath('/anychartlab/'.($l->statement === 'IS' ? 'incomestatement.php' : 'balancesheet.php'), 1).'?layout='.$l->rowid;
+		$test = dol_buildpath('/financialreporting/'.($l->statement === 'IS' ? 'incomestatement.php' : 'balancesheet.php'), 1).'?layout='.$l->rowid;
 		print '<tr class="oddeven"><td><a href="'.$self.'?id='.$l->rowid.'"><b>'.dol_escape_htmltag($l->label).'</b></a></td><td>'.dol_escape_htmltag($l->code).'</td><td>'.$statements[$l->statement].'</td>';
 		print '<td class="opacitymedium">'.dol_escape_htmltag($l->source.($l->source_ref ? ': '.$l->source_ref : '')).'</td><td class="center">'.((int) $l->nblines).'</td>';
 		print '<td class="right nowraponall"><a href="'.$self.'?id='.$l->rowid.'">Edit</a> · <a href="'.$test.'">View report</a> · <a href="'.$self.'?id='.$l->rowid.'&action=export&token='.newToken().'">Export</a> · <a href="'.$self.'?id='.$l->rowid.'&action=duplicate&token='.newToken().'">Duplicate</a> · <a href="'.$self.'?id='.$l->rowid.'&action=delete&token='.newToken().'">Delete</a></td></tr>';
@@ -198,20 +202,20 @@ if (!$layout) {
 	print '<tr class="oddeven"><td class="titlefield">Load a layout file</td><td><form method="POST" action="'.$self.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="loadfile">';
 	$fileOptions = array();
 $preselect = '';
-foreach (anychartlab_catalog_ranked('layout', $pcgversion) as $e) {
+foreach (financialreporting_catalog_ranked('layout', $pcgversion) as $e) {
 	$fileOptions[$e['file']] = ($e['match'] !== '' ? '★ ' : '').$e['label'].($e['match'] === 'chart' ? ' (made for chart '.$pcgversion.')' : ($e['match'] === 'country' ? ' (for your country)' : ''));
 	if ($preselect === '' && $e['match'] !== '') {
 		$preselect = $e['file'];
 	}
 }
-foreach (anychartlab_layout_files() as $f => $desc) {
+foreach (financialreporting_layout_files() as $f => $desc) {
 	if (!isset($fileOptions[$f])) {
 		$fileOptions[$f] = $desc;
 	}
 }
 print $form->selectarray('layout_file', $fileOptions, $preselect, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').' <input type="submit" class="button small" value="Load"> <span class="opacitymedium">★ = suggested for your chart / country</span></form></td></tr>';
 	print '<tr class="oddeven"><td>Copy a Dolibarr personalised report</td><td><form method="POST" action="'.$self.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="copycore">';
-	print $form->selectarray('core_report', anychartlab_core_reports($db, $entity), '', 0, 0, 0, '', 0, 0, 0, '', 'minwidth200').' as '.$form->selectarray('core_statement', $statements, 'IS').' <input type="submit" class="button small" value="Copy"> <span class="opacitymedium">(read only: your personalised groups are not changed)</span></form></td></tr>';
+	print $form->selectarray('core_report', financialreporting_core_reports($db, $entity), '', 0, 0, 0, '', 0, 0, 0, '', 'minwidth200').' as '.$form->selectarray('core_statement', $statements, 'IS').' <input type="submit" class="button small" value="Copy"> <span class="opacitymedium">(read only: your personalised groups are not changed)</span></form></td></tr>';
 	print '<tr class="oddeven"><td>Import a layout CSV</td><td><form method="POST" enctype="multipart/form-data" action="'.$self.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="import"><input type="file" name="importfile" accept=".csv,text/csv"> <input type="submit" class="button small" value="Import"></form></td></tr>';
 	print '<tr class="oddeven"><td>New empty layout</td><td><form method="POST" action="'.$self.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="create">';
 	print 'Name <input type="text" name="new_label" class="flat minwidth200" placeholder="e.g. My balance sheet"> Code <input type="text" name="new_code" class="flat maxwidth100" placeholder="MY-BS"> '.$form->selectarray('new_statement', $statements, 'BS').' <input type="submit" class="button small" value="Create"></form></td></tr>';
@@ -222,13 +226,13 @@ print $form->selectarray('layout_file', $fileOptions, $preselect, 0, 0, 0, '', 0
 }
 
 // ---- Editor ----
-$check = anychartlab_layout_static_check($layout, $accounts);
+$check = financialreporting_layout_static_check($layout, $accounts);
 $values = array('RESULT' => 0.0);
 $formulaErrors = array();
 foreach ($layout->lines as $l) {
 	if ($l->type === 'formula') {
 		$errs = array();
-		anychartlab_formula_eval($l->formula, $values, $errs);
+		financialreporting_formula_eval($l->formula, $values, $errs);
 		foreach ($errs as $e) {
 			$formulaErrors[] = 'Line '.$l->code.': unknown code "'.$e.'" (codes must be defined on an earlier line'.($layout->statement === 'BS' ? '; RESULT = result of unclosed periods' : '').').';
 		}
@@ -243,7 +247,7 @@ foreach ($accounts['byRowid'] as $acc) {
 	$accountOptions[(int) $acc->rowid] = $acc->account_number.' - '.$acc->label.($acc->nature ? ' ('.$acc->nature.')' : '');
 }
 $natureOptions = $natures;
-$reportUrl = dol_buildpath('/anychartlab/'.($layout->statement === 'IS' ? 'incomestatement.php' : 'balancesheet.php'), 1).'?layout='.$layout->rowid;
+$reportUrl = dol_buildpath('/financialreporting/'.($layout->statement === 'IS' ? 'incomestatement.php' : 'balancesheet.php'), 1).'?layout='.$layout->rowid;
 
 print '<p><a href="'.$self.'">← All layouts</a> · <a href="'.$reportUrl.'"><b>View the report with this layout</b></a> · <a href="'.$self.'?id='.$layout->rowid.'&action=export&token='.newToken().'">Export CSV</a></p>';
 
@@ -297,11 +301,11 @@ $lineRow = function ($key, $l) use ($form, $natureOptions, $accountOptions, $lay
 	print '<td><input type="text" name="position_'.$key.'" class="flat width40" value="'.($isNew ? '' : (int) $l->position).'"'.($isNew ? ' placeholder="end"' : '').'></td>';
 	print '<td><input type="text" name="code_'.$key.'" class="flat width75" value="'.($isNew ? '' : dol_escape_htmltag($l->code)).'"'.($isNew ? ' placeholder="NEW"' : '').'></td>';
 	print '<td><input type="text" name="label_'.$key.'" class="flat minwidth150" value="'.($isNew ? '' : dol_escape_htmltag($l->label)).'"'.($isNew ? ' placeholder="Add a line…"' : '').'></td>';
-	print '<td>'.$form->selectarray('type_'.$key, anychartlab_layout_types(), $type, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
+	print '<td>'.$form->selectarray('type_'.$key, financialreporting_layout_types(), $type, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
 	print '<td>'.$form->multiselectarray('natures_'.$key, $natureOptions, $isNew ? array() : array_filter(explode('|', (string) $l->natures)), 0, 0, 'minwidth150', 0, 0).'</td>';
 	print '<td><input type="text" name="accounts_'.$key.'" class="flat minwidth100" value="'.($isNew ? '' : dol_escape_htmltag((string) $l->accounts)).'" placeholder="e.g. 11,12,!1301"></td>';
 	print '<td><input type="text" name="formula_'.$key.'" class="flat minwidth100" value="'.($isNew ? '' : dol_escape_htmltag((string) $l->formula)).'" placeholder="e.g. REVENUE-COGS"></td>';
-	print '<td>'.$form->selectarray('sign_'.$key, anychartlab_layout_signs(), $isNew ? 'natural' : $l->sign, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
+	print '<td>'.$form->selectarray('sign_'.$key, financialreporting_layout_signs(), $isNew ? 'natural' : $l->sign, 0, 0, 0, '', 0, 0, 0, '', 'minwidth100').'</td>';
 	if ($isNew) {
 		print '<td class="opacitymedium">(after saving)</td><td></td><td></td><td></td>';
 	} else {

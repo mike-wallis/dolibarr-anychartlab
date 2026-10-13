@@ -1,0 +1,29 @@
+# Financial Reporting: GENERIC class rules, applied to every chart after the chart's own class rules,
+# only to accounts with a nature and no class yet. First match wins; nature limits which accounts a
+# rule applies to. Matching uses the account group (pcg_type) where it clearly means a class, else
+# words in the account label (English and French). Accounts no rule takes get the class of their
+# parent, or of their children when these all agree, else the default class of the nature
+# (marked "default" so Getting started asks for a review).
+# Columns: nature;pcg_type;account_prefix;label_contains;class;comment  (several values separated by |)
+nature;pcg_type;account_prefix;label_contains;class;comment
+ASSET;;;prepaid|prepayment|deposit|receivable|debtor|inventor|stock|charges constatées|créances|clients;CURRENT_ASSET;Prepayments, receivables, inventories (before the fixed-asset words: "Prepaid vehicle deposits" is current)
+ASSET;;;bank|cash|cheque|chq|savings|transaction|offset|paypal|pay pal|petty|undeposited|a/c|banque|caisse|disponibilit;CASH;Cash and cash equivalents
+ASSET;;;furniture|equipment|vehicle|plant|machinery|fixture|fitting|building|land|goodwill|intangible|depreciation|amortis|amortiz|at cost|computer|software|patent|trademark|leasehold|immobilis|matériel|mobilier|fonds commercial;NONCURRENT_ASSET;Fixed assets and their accumulated depreciation
+LIABILITY;;;overdraft|découvert|concours bancaire;CASH;Bank overdraft / short-term bank credit
+LIABILITY;;;credit card|mastercard|visa|amex;CURRENT_LIABILITY;Credit cards are current even when called "capital"
+LIABILITY;;;long service|lsl;NONCURRENT_LIABILITY;Long service leave (mostly non-current)
+LIABILITY;;;creditor|payable|accrued|accrual|gst|vat|tax|payg|wages|salar|super|holiday|annual leave|sick leave|entitlement|fournisseurs|dettes fiscales|dettes sociales;CURRENT_LIABILITY;Trade and other payables, taxes, employee entitlements
+LIABILITY;;;loan|mortgage|hire purchase|lease liabilit|borrowing|debenture|non-current|non current|emprunt;NONCURRENT_LIABILITY;Borrowings (check for current portions)
+EQUITY;;;;EQUITY;
+INCOME;OTHER_REVENUE|OTHER_INCOME;;;OTHER_OPERATING_INCOME;
+INCOME;;;interest|dividend|investment income|intérêt|produits financiers;FINANCIAL_INCOME;
+INCOME;;;gain on|disposal|sale of asset|exceptionnel|extraordinary;NONRECURRING_INCOME;
+INCOME;;;other income|rebate|grant|subsid|jobkeeper|boost|reimburs|discount received|recover|refund|uncategor|unallocated|commission received|royalt|rent received|autres produits|subvention;OTHER_OPERATING_INCOME;
+INCOME;;;sales|revenue|turnover|fees|service|freight|repairs|ventes|prestations|chiffre;REVENUE;
+EXPENSE;COGS|COST_OF_SALES|COST_OF_GOODS_SOLD;;;COST_OF_SALES;
+EXPENSE;;;income tax|tax expense|impôt sur les bénéfices|impôts sur les bénéfices|impôt sur les sociétés;INCOME_TAX;
+EXPENSE;;;cogs|cost of goods|cost of sales|cost of services|purchases|inventory adjust|stock adj|achats de marchandises|variation de stock;COST_OF_SALES;Before depreciation: "Stock adj - write off old stock" is cost of sales
+EXPENSE;;;depreciation|amortisation|amortization|impairment|write off|write-off|write down|dotation;DEPRECIATION;
+EXPENSE;;;interest|loan int|borrowing cost|intérêt|frais financiers|charges financières;FINANCE_COST;
+EXPENSE;;;loss on disposal|exceptionnel|extraordinary;NONRECURRING_EXPENSE;
+EXPENSE;;;wage|salar|payroll|superannuation|super contrib|employee|staff|workers comp|leave|personnel|salaires|charges sociales;EMPLOYEE_COST;

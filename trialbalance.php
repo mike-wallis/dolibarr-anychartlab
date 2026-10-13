@@ -1,6 +1,6 @@
 <?php
 /**
- * Any-Chart Reports Lab — Trial Balance over a period: opening balance, debits,
+ * Financial Reporting — Trial Balance over a period: opening balance, debits,
  * credits and closing balance of every account, with its nature, in account order
  * or grouped by nature. Closing balances are the Balance Sheet at the end date.
  */
@@ -15,23 +15,27 @@ if (!$res && is_file('../../main.inc.php')) {
 if (!$res) {
 	die('Include of main fails');
 }
-require_once __DIR__.'/lib/anychartlab.lib.php';
+require_once __DIR__.'/lib/financialreporting.lib.php';
+require_once __DIR__.'/lib/setup.lib.php';
 require_once __DIR__.'/lib/trialbalance.lib.php';
 
-if (!$user->hasRight('anychartlab', 'lire')) {
+if (!isModEnabled('financialreporting')) {
+	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
+}
+if (!$user->hasRight('financialreporting', 'lire')) {
 	accessforbidden();
 }
 
 $action = GETPOST('action', 'aZ09');
 $groupBy = (GETPOST('groupby', 'aZ09') === 'nature' ? 'nature' : 'none');
 $to = GETPOSTINT('dateendyear') ? dol_mktime(23, 59, 59, GETPOSTINT('dateendmonth'), GETPOSTINT('dateendday'), GETPOSTINT('dateendyear')) : dol_now();
-$from = GETPOSTINT('datestartyear') ? dol_mktime(0, 0, 0, GETPOSTINT('datestartmonth'), GETPOSTINT('datestartday'), GETPOSTINT('datestartyear')) : anychartlab_fiscal_year_start($to);
+$from = GETPOSTINT('datestartyear') ? dol_mktime(0, 0, 0, GETPOSTINT('datestartmonth'), GETPOSTINT('datestartday'), GETPOSTINT('datestartyear')) : financialreporting_fiscal_year_start($to);
 
 $entity = (int) $conf->entity;
-$pcgversion = anychartlab_active_chart($db);
-$accounts = ($pcgversion !== '' ? anychartlab_load_accounts($db, $entity, $pcgversion) : null);
-$tb = ($accounts && $from <= $to ? anychartlab_tb_build($db, $entity, $accounts, $from, $to) : null);
-$rows = ($tb ? anychartlab_tb_rows($tb, $groupBy) : array());
+$pcgversion = financialreporting_active_chart($db);
+$accounts = ($pcgversion !== '' ? financialreporting_load_accounts($db, $entity, $pcgversion) : null);
+$tb = ($accounts && $from <= $to ? financialreporting_tb_build($db, $entity, $accounts, $from, $to) : null);
+$rows = ($tb ? financialreporting_tb_rows($tb, $groupBy) : array());
 $header = array('Account', 'Label', 'Nature', 'Note', 'Opening (Dr - Cr)', 'Debit', 'Credit', 'Closing debit', 'Closing credit');
 
 if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $tb) {
@@ -45,7 +49,7 @@ if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $tb) {
 			}
 			$csv[] = $c;
 		}
-		anychartlab_send_csv('anychartlab-'.$name, $header, $csv);
+		financialreporting_send_csv('financialreporting-'.$name, $header, $csv);
 	}
 	$columns = array(
 		array('title' => 'Account', 'width' => 0.08, 'align' => 'L', 'indent' => 1),
@@ -62,18 +66,19 @@ if (in_array($action, array('export', 'pdf', 'pdfpreview')) && $tb) {
 		$c = $r['cells'];
 		$cells = array((string) $c[0], (string) $c[1], (string) $c[2]);
 		for ($i = 4; $i < 9; $i++) {
-			$cells[] = ($c[$i] === '' ? '' : anychartlab_price($c[$i]));
+			$cells[] = ($c[$i] === '' ? '' : financialreporting_price($c[$i]));
 		}
 		$pdfRows[] = array('kind' => $r['kind'], 'cells' => $cells);
 	}
-	anychartlab_pdf_table($name, 'Trial Balance', dol_print_date($from, 'day').' to '.dol_print_date($to, 'day').' · '.$tb['window']['label'].' · amounts in '.$conf->currency, $columns, $pdfRows, $action === 'pdfpreview', 'L');
+	financialreporting_pdf_table($name, 'Trial Balance', dol_print_date($from, 'day').' to '.dol_print_date($to, 'day').' · '.$tb['window']['label'].' · amounts in '.$conf->currency, $columns, $pdfRows, $action === 'pdfpreview', 'L');
 }
 
 $form = new Form($db);
-llxHeader('', 'Trial Balance (Any-Chart Lab)', '', '', 0, 0, '', '', '', 'mod-anychartlab page-trialbalance');
+llxHeader('', 'Trial Balance (Financial Reporting)', '', '', 0, 0, '', '', '', 'mod-financialreporting page-trialbalance');
 print load_fiche_titre('Trial Balance', '', 'accountancy');
-anychartlab_print_style_css();
-anychartlab_print_nav('trialbalance.php', $pcgversion);
+financialreporting_print_style_css();
+financialreporting_print_nav('trialbalance.php', $pcgversion);
+financialreporting_setup_gate($db, (int) $conf->entity, true);
 
 if (!$accounts) {
 	print '<div class="warning">No chart of accounts is selected.</div>';
@@ -107,17 +112,17 @@ if ($tb['cut']) {
 
 print '<div class="div-table-responsive"><table class="noborder centpercent">';
 print '<tr class="liste_titre"><th>Account</th><th>Label</th><th>Nature</th><th class="right">Opening<br><span class="opacitymedium">(Dr − Cr)</span></th><th class="right">Debit</th><th class="right">Credit</th><th class="right">Closing debit</th><th class="right">Closing credit</th></tr>';
-$setupUrl = dol_buildpath('/anychartlab/admin/setup.php', 1);
+$setupUrl = dol_buildpath('/financialreporting/admin/setup.php', 1);
 foreach ($rows as $r) {
 	$c = $r['cells'];
 	$kind = $r['kind'];
 	$trClass = ($kind === 'section' ? 'liste_titre' : (in_array($kind, array('total', 'grandtotal')) ? 'liste_total' : 'oddeven'));
-	print '<tr class="'.$trClass.' acl-'.$kind.'">';
+	print '<tr class="'.$trClass.' fr-'.$kind.'">';
 	if ($kind === 'section') {
 		print '<td colspan="3">'.dol_escape_htmltag($c[0]).'</td>';
 	} else {
 		$isAcc = ($kind === 'account' && $c[0] !== '');
-		print '<td class="nowraponall">'.($isAcc ? '<a href="'.anychartlab_ledger_url($c[0]).'" target="_blank">'.dol_escape_htmltag($c[0]).'</a>' : '').'</td>';
+		print '<td class="nowraponall">'.($isAcc ? '<a href="'.financialreporting_ledger_url($c[0]).'" target="_blank">'.dol_escape_htmltag($c[0]).'</a>' : '').'</td>';
 		print '<td>'.dol_escape_htmltag($c[1]).'</td>';
 		if ($isAcc && $c[3] === 'unclassified') {
 			print '<td><a href="'.$setupUrl.'?search_account='.urlencode($c[0]).'" class="error">unclassified</a></td>';
@@ -128,7 +133,7 @@ foreach ($rows as $r) {
 		}
 	}
 	for ($i = 4; $i < 9; $i++) {
-		print '<td class="right amount nowraponall">'.($c[$i] === '' ? '' : anychartlab_price($c[$i])).'</td>';
+		print '<td class="right amount nowraponall">'.($c[$i] === '' ? '' : financialreporting_price($c[$i])).'</td>';
 	}
 	print '</tr>';
 }
@@ -142,8 +147,8 @@ print '<p class="opacitymedium">* hover for a note: alternate nature used becaus
 $t = $tb['totals'];
 $okMoves = (abs($t['debit'] - $t['credit']) < 0.005);
 $okClosing = (abs($t['closing_dr'] - $t['closing_cr']) < 0.005);
-print '<div class="'.($okMoves ? 'ok' : 'error').'"><b>Check 1:</b> debits of the period '.anychartlab_price($t['debit']).($okMoves ? ' = ' : ' ≠ ').'credits '.anychartlab_price($t['credit']).($okMoves ? '.' : ': difference '.anychartlab_price($t['debit'] - $t['credit']).'. The ledger does not balance for this period.').'</div>';
-print '<div class="'.($okClosing ? 'ok' : 'error').'"><b>Check 2:</b> closing debit balances '.anychartlab_price($t['closing_dr']).($okClosing ? ' = ' : ' ≠ ').'closing credit balances '.anychartlab_price($t['closing_cr']).($okClosing ? '.' : ': difference '.anychartlab_price($t['closing_dr'] - $t['closing_cr']).'.').'</div>';
+print '<div class="'.($okMoves ? 'ok' : 'error').'"><b>Check 1:</b> debits of the period '.financialreporting_price($t['debit']).($okMoves ? ' = ' : ' ≠ ').'credits '.financialreporting_price($t['credit']).($okMoves ? '.' : ': difference '.financialreporting_price($t['debit'] - $t['credit']).'. The ledger does not balance for this period.').'</div>';
+print '<div class="'.($okClosing ? 'ok' : 'error').'"><b>Check 2:</b> closing debit balances '.financialreporting_price($t['closing_dr']).($okClosing ? ' = ' : ' ≠ ').'closing credit balances '.financialreporting_price($t['closing_cr']).($okClosing ? '.' : ': difference '.financialreporting_price($t['closing_dr'] - $t['closing_cr']).'.').'</div>';
 $unclassified = count(array_filter($tb['lines'], function ($l) {
 	return in_array($l['group'], array('UNCLASSIFIED', 'UNKNOWN'));
 }));
