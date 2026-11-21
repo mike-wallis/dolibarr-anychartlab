@@ -44,4 +44,5 @@ pcg_type;account_prefix;label_contains;nature;nature_alt;contra;comment
 ;709;;INCOME;;1;Rabais, remises et ristournes accordes
 ;713;;INCOME;EXPENSE;0;Variation des stocks produits (peut etre debiteur)
 ;7;;INCOME;;0;Produits
-;8|9;;EXCLUDED;;0;Comptes speciaux (engagements, bilan d'ouverture et de cloture), comptabilite analytique
+;88;;EQUITY;;0;Resultat en instance d'affectation (capitaux propres)
+;8|9;;EXCLUDED;;0;Comptes speciaux : engagements hors bilan (80), contributions volontaires en nature (86, 87 : PCG18-ASSOC, a presenter en pied du compte de resultat, hors des etats ici), bilan d'ouverture et de cloture (89) / comptabilite analytique (9)

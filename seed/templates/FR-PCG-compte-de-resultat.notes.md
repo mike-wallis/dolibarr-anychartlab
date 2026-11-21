@@ -8,7 +8,8 @@ Le PCG (règlement ANC 2014-03) fixe un compte de résultat **par nature**, en t
   **résultat financier**. Exploitation + financier = **résultat courant avant impôts**.
 - **Exceptionnel** : produits (77, 787, 797) moins charges exceptionnelles (67, 687) =
   **résultat exceptionnel**.
-- Puis **participation des salariés** (691) et **impôts sur les bénéfices** (69) =
+- Puis **participation des salariés** (691) et **impôts sur les bénéfices** (695, 696, 698 : le
+  reste du groupe 69, 691 étant pris en premier) =
   **bénéfice ou perte**.
 
 À savoir :

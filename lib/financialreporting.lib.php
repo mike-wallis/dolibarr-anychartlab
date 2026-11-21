@@ -515,7 +515,10 @@ function financialreporting_window_start($db, $entity, $asof)
 		while ($obj = $db->fetch_object($resql)) {
 			$years[] = $obj;
 			$end = $db->jdate($obj->date_end);
-			if ((int) $obj->statut === 1 && $end < $asof && ($lastClosedEnd === null || $end > $lastClosedEnd)) {
+			// Only a year whose last day is over before the as-of date: date_end is that day at 00:00, and the
+			// reports use an as-of date at 23:59:59, so "$end < $asof" took the closed year containing the date
+			// itself and the window started after the as-of date (empty statement shown as balanced)
+			if ((int) $obj->statut === 1 && dol_time_plus_duree($end, 1, 'd') <= $asof && ($lastClosedEnd === null || $end > $lastClosedEnd)) {
 				$lastClosedEnd = $end;
 				$res['label'] = 'entries after the closure of '.$obj->label;
 			}
@@ -523,6 +526,10 @@ function financialreporting_window_start($db, $entity, $asof)
 	}
 	if ($lastClosedEnd !== null) {
 		$res['start'] = dol_time_plus_duree($lastClosedEnd, 1, 'd');
+		if ($res['start'] > $asof) {
+			// Should not happen any more; never show an empty window as a balanced statement
+			$res['warnings'][] = 'The window would start after the as-of date: the figures are not reliable.';
+		}
 		foreach ($years as $obj) {
 			if ((int) $obj->statut !== 1 && $db->jdate($obj->date_end) <= $lastClosedEnd) {
 				$res['warnings'][] = 'Fiscal year "'.$obj->label.'" is not closed but ends before a closed one. Closure only carries forward the closed year\'s own movements, so its result may be missing.';

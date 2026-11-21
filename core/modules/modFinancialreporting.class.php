@@ -26,13 +26,13 @@ class modFinancialreporting extends DolibarrModules
 	{
 		parent::__construct($db);
 
-		$this->numero          = 500023;
+		$this->numero          = 491738;	// range 491730-491739 reserved for Dolibarr User Australia (wiki: List of modules id); 500023 until 0.3, shared with the prototype
 		$this->rights_class    = 'financialreporting';
 		$this->family          = 'financial';
 		$this->picto           = 'accountancy';
 		$this->name            = 'Financial Reporting';
 		$this->description     = 'Balance Sheet, Income Statement, Trial Balance, Cash Flow and aged receivables/payables for any chart of accounts and any country. A wizard builds your income statement as a Dolibarr personalised report from a country template. Development version, feedback welcome on Dolibarr issue #31760.';
-		$this->version         = '0.3';
+		$this->version         = '0.4';
 		$this->const_name      = 'MAIN_MODULE_FINANCIALREPORTING';
 		$this->editor_name     = 'Dolibarr User Australia';
 		$this->editor_url      = 'mailto:dolibarruseraustralia@gmail.com';
@@ -110,13 +110,13 @@ class modFinancialreporting extends DolibarrModules
 
 		$this->rights = array();
 		$r = 0;
-		$this->rights[$r][0] = 502301;
+		$this->rights[$r][0] = $this->numero * 10 + 1;	// own ids since 0.4 (502301 / 502302 were shared with the prototype anychartlab)
 		$this->rights[$r][1] = 'View financial reports (full company financials)';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'lire';
 		$r++;
-		$this->rights[$r][0] = 502302;
+		$this->rights[$r][0] = $this->numero * 10 + 2;
 		$this->rights[$r][1] = 'Set up financial reporting (account natures, report wizard, layouts)';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;

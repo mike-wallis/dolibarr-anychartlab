@@ -4,8 +4,8 @@
 class;heading;required;note
 NONCURRENT_ASSET;Actif immobilisé (incorporel, corporel, financier);yes;
 CURRENT_ASSET;Actif circulant (stocks, créances, VMP) et comptes de régularisation;yes;
-CASH;Disponibilités ; concours bancaires courants (au passif);yes;
-NONCURRENT_LIABILITY;Provisions ; emprunts et dettes financières;yes;
+CASH;Disponibilités;yes;No trésorerie-passif heading in the PCG: bank overdrafts (519) are shown in "Emprunts et dettes auprès des établissements de crédit"
+NONCURRENT_LIABILITY;Emprunts et dettes financières / provisions pour risques et charges;yes;Provisions pour risques et charges (15) are a heading of their own, between capitaux propres and dettes: split them with a reporting group
 CURRENT_LIABILITY;Dettes fournisseurs, fiscales et sociales, autres dettes;yes;
 EQUITY;Capitaux propres;yes;
 REVENUE;Chiffre d'affaires (ventes de marchandises, production vendue);yes;
@@ -13,9 +13,9 @@ OTHER_OPERATING_INCOME;Production stockée et immobilisée, subventions, reprise
 FINANCIAL_INCOME;Produits financiers;yes;Résultat financier
 NONRECURRING_INCOME;Produits exceptionnels;yes;Résultat exceptionnel
 COST_OF_SALES;Achats de marchandises et de matières, variation des stocks;yes;
-EMPLOYEE_COST;Salaires et traitements ; charges sociales;yes;
+EMPLOYEE_COST;Salaires et traitements / charges sociales / participation des salariés;yes;Participation des salariés (691) has its own line after the résultat exceptionnel, before income tax: split it with a reporting group
 DEPRECIATION;Dotations aux amortissements, dépréciations et provisions;yes;
-OPERATING_EXPENSE;Autres achats et charges externes ; impôts et taxes ; autres charges;yes;
+OPERATING_EXPENSE;Autres achats et charges externes / impôts et taxes / autres charges;yes;
 FINANCE_COST;Charges financières;yes;Résultat financier
 NONRECURRING_EXPENSE;Charges exceptionnelles;yes;Résultat exceptionnel
-INCOME_TAX;Participation des salariés ; impôts sur les bénéfices;yes;
+INCOME_TAX;Impôts sur les bénéfices;yes;

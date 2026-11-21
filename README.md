@@ -9,12 +9,18 @@ on DoliStore, then Dolibarr core.
 tables. The one exception is the Report wizard, which can create **new** Dolibarr personalised
 reports. It never changes existing ones, the chart of accounts or the ledger.
 
-> **Renamed:** this module was the prototype "Any-Chart Reports Lab" (folder `anychartlab`). If you
-> installed the prototype, disable and remove it before installing this one. Its natures and
-> layouts don't carry over automatically: export your natures as CSV from the old module first, then
-> import them here.
+> **Upgrading**
+>
+> - **From the prototype "Any-Chart Reports Lab"** (folder `anychartlab`, v0.1 / v0.2): export your
+>   natures as CSV from the old module, then **disable it and delete its folder before installing this
+>   one**. Natures and layouts don't carry over automatically: import the CSV here afterwards.
+> - **From Financial Reporting v0.3**: copy the new files over the old ones, then **disable and
+>   re-enable** Financial Reporting in Setup > Modules. Since v0.4 the module has its own module number
+>   (491738) and permission ids; v0.3 shared them with the prototype, so installed next to it, it got no
+>   permissions at all. Your natures, classes, layouts and settings are kept. Administrators get the
+>   permissions back automatically; tick them again for other users (Users & Groups > Permissions).
 
-> **Status: development version (v0.3), for testing and feedback.** Not a finished module: please try it on a
+> **Status: development version (v0.4), for testing and feedback.** Not a finished module: please try it on a
 > copy of your database or a test install first, and report problems on
 > [#31760](https://github.com/Dolibarr/dolibarr/issues/31760) or in this repository's Issues.
 
@@ -39,7 +45,7 @@ Two optional extras per account:
 
 ## Try it
 
-1. Requirements: Dolibarr 23 or later, Double-entry Accounting module enabled, a chart of accounts
+1. Requirements: Dolibarr 23 or later (tested on 23.0.4, 24.0.1 and 24.0.3), Double-entry Accounting module enabled, a chart of accounts
    selected (Accounting > Setup).
 2. Install it, either way:
    - **Zip** (easiest): download `module_financialreporting-x.y.zip` from this repository's
@@ -212,8 +218,8 @@ Each match column can hold several values separated by `|`. An empty match colum
 ## Limits (prototype)
 
 - English only.
-- Module number `500023` is in Dolibarr's range for private modules: fine for testing, an official
-  number would be reserved if this ever became a published module.
+- Module number `491738` is from the range reserved for Dolibarr User Australia (Dolibarr wiki, list of
+  module ids). Up to v0.3 it was `500023`, shared with the prototype.
 - Rule sets: France (PCG: PCG25-DEV, PCG18-ASSOC, PCGAFR14-DEV, PCG99 New Caledonia), Australia
   (AU-BASE), United States (US-BASE, US-GAAP-BASIC), plus generic rules. Layouts: France and
   Australia. The French files need checking by French accountants.
@@ -221,5 +227,12 @@ Each match column can hold several values separated by `|`. An empty match colum
   countries with a national numbering standard (e.g. France).
 - The Balance Sheet window starts after the last **closed** fiscal year. It assumes fiscal years
   are closed in order and warns if they aren't.
+- Classes follow the national presentation by default. Two things the account number can't decide,
+  so check them on Setup > Account natures: the part of a loan due within a year stays non-current, and for
+  a services or construction business some purchases (in France 604 / 605) may be cost of sales
+  rather than operating expenses.
+- Accounts excluded on purpose (nature EXCLUDED): off-balance-sheet commitments, opening / closing
+  balance accounts, analytical accounts, and in France 86 / 87 contributions in kind (PCG18-ASSOC:
+  a note at the foot of the income statement, not part of the statements).
 
 Licence: GPL v3 or later. Published by Dolibarr User Australia.
