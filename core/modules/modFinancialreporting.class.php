@@ -32,7 +32,7 @@ class modFinancialreporting extends DolibarrModules
 		$this->picto           = 'accountancy';
 		$this->name            = 'Financial Reporting';
 		$this->description     = 'Balance Sheet, Income Statement, Trial Balance, Cash Flow and aged receivables/payables for any chart of accounts and any country. A wizard builds your income statement as a Dolibarr personalised report from a country template. Development version, feedback welcome on Dolibarr issue #31760.';
-		$this->version         = '0.4';
+		$this->version         = '0.4.1';
 		$this->const_name      = 'MAIN_MODULE_FINANCIALREPORTING';
 		$this->editor_name     = 'Dolibarr User Australia';
 		$this->editor_url      = 'mailto:dolibarruseraustralia@gmail.com';
@@ -52,7 +52,7 @@ class modFinancialreporting extends DolibarrModules
 			'langs'    => '',
 			'position' => 960,
 			'enabled'  => 'isModEnabled("financialreporting")',
-			'perms'    => '$user->hasRight("financialreporting", "lire")',
+			'perms'    => '$user->hasRight("financialreporting", "lire") || $user->admin',
 			'target'   => '',
 			'user'     => 0,
 		);
@@ -77,7 +77,7 @@ class modFinancialreporting extends DolibarrModules
 				'langs'    => '',
 				'position' => $p[3],
 				'enabled'  => 'isModEnabled("financialreporting")',
-				'perms'    => '$user->hasRight("financialreporting", "'.$p[4].'")',
+				'perms'    => '$user->hasRight("financialreporting", "'.$p[4].'") || $user->admin',
 				'target'   => '',
 				'user'     => 0,
 			);
@@ -102,7 +102,7 @@ class modFinancialreporting extends DolibarrModules
 				'langs'    => 'financialreporting@financialreporting',
 				'position' => $p[3],
 				'enabled'  => 'isModEnabled("financialreporting") && $leftmenu=="financialreporting_setupmenu"',
-				'perms'    => '$user->hasRight("financialreporting", "setup")',
+				'perms'    => '$user->hasRight("financialreporting", "setup") || $user->admin',
 				'target'   => '',
 				'user'     => 0,
 			);

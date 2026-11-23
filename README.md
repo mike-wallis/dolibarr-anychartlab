@@ -19,8 +19,11 @@ reports. It never changes existing ones, the chart of accounts or the ledger.
 >   (491738) and permission ids; v0.3 shared them with the prototype, so installed next to it, it got no
 >   permissions at all. Your natures, classes, layouts and settings are kept. Administrators get the
 >   permissions back automatically; tick them again for other users (Users & Groups > Permissions).
+> - **From v0.4**: copy the new files over the old ones. Disable and re-enable only if you want the menu
+>   change of v0.4.1: administrators then see the menus even if the permissions failed to install (the
+>   report pages already let them in without it).
 
-> **Status: development version (v0.4), for testing and feedback.** Not a finished module: please try it on a
+> **Status: development version (v0.4.1), for testing and feedback.** Not a finished module: please try it on a
 > copy of your database or a test install first, and report problems on
 > [#31760](https://github.com/Dolibarr/dolibarr/issues/31760) or in this repository's Issues.
 
@@ -228,7 +231,8 @@ Each match column can hold several values separated by `|`. An empty match colum
 - The Balance Sheet window starts after the last **closed** fiscal year. It assumes fiscal years
   are closed in order and warns if they aren't.
 - Classes follow the national presentation by default. Two things the account number can't decide,
-  so check them on Setup > Account natures: the part of a loan due within a year stays non-current, and for
+  so check them on Setup > Account natures: the part of a loan due within a year stays non-current (planned:
+  an option to take it from the Loans module schedule, for layouts with a current / non-current split), and for
   a services or construction business some purchases (in France 604 / 605) may be cost of sales
   rather than operating expenses.
 - Accounts excluded on purpose (nature EXCLUDED): off-balance-sheet commitments, opening / closing

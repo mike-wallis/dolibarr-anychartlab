@@ -27,7 +27,7 @@ require_once __DIR__.'/lib/setup.lib.php';
 if (!isModEnabled('financialreporting')) {
 	accessforbidden('Module Financial Reporting is not enabled (Setup > Modules).');
 }
-if (!$user->hasRight('financialreporting', 'lire')) {
+if (!$user->hasRight('financialreporting', 'lire') && !$user->admin) {	// admin: not locked out if the permissions failed to install
 	accessforbidden();
 }
 
